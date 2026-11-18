@@ -145,3 +145,8 @@ networks:
     buy: {where: Histadrut "ביחד בשבילך" wallet (members), url: "https://memberbenefits.histadrut.org.il/",
           note: "Members load the wallet at a discount (reported 25%)", discount_pct: 25}
     stores: []
+  - name: chefZone Wonder
+    aliases: [שף זון וונדר, שף זון - וונדר, chefZone - Wonder]
+    catalog: {provider: htzone, id: 8}
+    buy: {where: Poalim Wonder app (Bank Hapoalim club), url: "https://www.htzone.co.il/voucher-zone/8"}
+    stores: []
