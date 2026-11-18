@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+data/*.sqlite*
+# real voucher files stay local — only the generated sample is tracked
+data/vouchers/*
+!data/vouchers/my_vouchers.xlsx
+data/clubs.local.yaml

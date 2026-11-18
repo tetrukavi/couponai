@@ -1,0 +1,24 @@
+# Store name normalization seed. Add freely: canonical name + any spellings (Hebrew/English/domain).
+# `domain` is only a search hint for the web agent.
+stores:
+  - {canonical: Foot Locker, aliases: [פוט לוקר, פוטלוקר, footlocker, foot-locker], category: sport}
+  - {canonical: Nike, aliases: [נייקי, נייק], category: sport}
+  - {canonical: Adidas, aliases: [אדידס], category: sport}
+  - {canonical: Castro, aliases: [קסטרו], domain: castro.com, category: fashion}
+  - {canonical: Fox, aliases: [פוקס], domain: fox.co.il, category: fashion}
+  - {canonical: Terminal X, aliases: [טרמינל איקס, טרמינל x, terminalx], domain: terminalx.com, category: fashion}
+  - {canonical: H&M, aliases: [HM, H and M, אייץ' אנד אם, אייץ אנד אם], category: fashion}
+  - {canonical: Zara, aliases: [זארה], category: fashion}
+  - {canonical: Golf, aliases: [גולף], category: fashion}
+  - {canonical: Renuar, aliases: [רנואר], category: fashion}
+  - {canonical: American Eagle, aliases: [אמריקן איגל], category: fashion}
+  - {canonical: Super-Pharm, aliases: [סופר-פארם, סופר פארם, superpharm, super pharm], domain: super-pharm.co.il, category: pharmacy}
+  - {canonical: Shufersal, aliases: [שופרסל], domain: shufersal.co.il, category: grocery}
+  - {canonical: Rami Levy, aliases: [רמי לוי], category: grocery}
+  - {canonical: KSP, aliases: [קיי אס פי, ק.ס.פ], domain: ksp.co.il, category: electronics}
+  - {canonical: Ivory, aliases: [אייבורי, איבורי], domain: ivory.co.il, category: electronics}
+  - {canonical: IKEA, aliases: [איקאה], domain: ikea.co.il, category: home}
+  - {canonical: ACE, aliases: [אייס], category: home}
+  - {canonical: Home Center, aliases: [הום סנטר], category: home}
+  - {canonical: Max Stock, aliases: [מקס סטוק], category: home}
+  - {canonical: Office Depot, aliases: [אופיס דיפו], category: office}

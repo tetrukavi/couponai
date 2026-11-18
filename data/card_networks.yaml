@@ -1,0 +1,16 @@
+# Multi-store gift-card networks -> stores that (probably) accept them.
+# SEED DATA, UNVERIFIED: the web agent re-checks acceptance online on every search.
+# Network matches are therefore shown as "verify" until the store-site agent confirms.
+networks:
+  - name: BuyMe ALL
+    aliases: [ביימי, BuyMe, ביי מי]
+    stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle, Super-Pharm, KSP, IKEA, ACE, Home Center]
+  - name: BuyMe Fashion
+    aliases: [ביימי אופנה]
+    stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle]
+  - name: Max Gift Card
+    aliases: [מקס גיפט קארד, כרטיס מתנה מקס]
+    stores: [Foot Locker, Nike, Castro, Fox, Super-Pharm, Shufersal, ACE, Home Center]
+  - name: תו הזהב
+    aliases: [Tav Hazahav, תו זהב]
+    stores: [Castro, Fox, Golf, Super-Pharm, ACE, Home Center, Max Stock]

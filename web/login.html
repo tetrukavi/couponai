@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>couponAI · Log in</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%2334d399'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 12a2 2 0 0 0 0 4v3h16v-3a2 2 0 0 0 0-4V9H8z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Heebo:wght@400;500;700&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      let t = null;
+      try { t = localStorage.getItem('couponai-theme'); } catch (e) {}
+      const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', dark);
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: {
+      fontFamily: { sans: ['Inter', 'Heebo', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'] },
+      colors: { ink: { 950: '#0b0d12', 900: '#11141b', 800: '#181c25', 700: '#232836' } } } } };
+  </script>
+</head>
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-ink-950 dark:text-slate-100 font-sans antialiased">
+  <main class="mx-auto flex min-h-full max-w-sm flex-col justify-center px-4 py-10">
+    <div class="mb-8 text-center">
+      <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-emerald-400 shadow-lg shadow-indigo-500/20">
+        <svg viewBox="0 0 24 24" class="h-7 w-7 text-white" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 0 0 6v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0 0-6V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M14 4v16" stroke-dasharray="2 2.5"/></svg>
+      </div>
+      <h1 class="mt-4 text-2xl font-semibold tracking-tight">coupon<span class="bg-gradient-to-r from-indigo-500 to-emerald-500 bg-clip-text text-transparent">AI</span></h1>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Log in to your household coupons</p>
+    </div>
+    <form id="f" class="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+      <label class="block">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Name</span>
+        <input name="name" autocomplete="username" required dir="auto"
+               class="mt-1 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-[16px] outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 dark:border-ink-700">
+      </label>
+      <label class="block">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Password</span>
+        <input name="password" type="password" autocomplete="current-password" required
+               class="mt-1 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-[16px] outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 dark:border-ink-700">
+      </label>
+      <p id="err" class="hidden rounded-xl bg-rose-500/10 p-2.5 text-sm text-rose-700 dark:text-rose-300"></p>
+      <button id="btn" class="w-full rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900">Log in</button>
+    </form>
+    <p class="mt-6 text-center text-[11px] text-slate-400">🔒 Read-only: couponAI never buys, redeems or pays.</p>
+  </main>
+  <script>
+    const f = document.getElementById('f'), err = document.getElementById('err'), btn = document.getElementById('btn');
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true; err.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Logging in…';
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: f.name.value, password: f.password.value }),
+        });
+        if (r.ok) { location.replace('/'); return; }
+        const d = await r.json().catch(() => ({}));
+        err.textContent = typeof d.detail === 'string' ? d.detail : 'Could not log in';
+        err.classList.remove('hidden');
+      } catch (_) {
+        err.textContent = 'Network error'; err.classList.remove('hidden');
+      }
+      btn.disabled = false; btn.textContent = 'Log in';
+    });
+  </script>
+</body>
+</html>

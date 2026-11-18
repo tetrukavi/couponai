@@ -1,0 +1,13 @@
+# Example loyalty-club list (public). Your real list stays private:
+#   locally  -> data/clubs.local.yaml (gitignored, same format; overrides this file)
+#   server   -> COUPONAI_CLUBS env var, a JSON list of the same objects
+# Each enabled club adds ~$0.04 to a paid search.
+# connector:
+#   public_web          -> searches the club's publicly accessible benefit pages
+#   mock_authenticated  -> placeholder for an SMS-OTP portal (later: persistent Playwright session)
+clubs:
+  - id: example_card_club
+    name: Example credit-card club
+    search_hint: "<club name in Hebrew and English> benefits / הטבות"
+    connector: public_web
+    enabled: false
