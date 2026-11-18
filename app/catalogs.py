@@ -304,6 +304,16 @@ class CatalogIndex:
                 return self.by_term[k]
         if domain and (h := _host(domain)) and h in self.by_host:
             return self.by_host[h]
+        for k in keys:  # the clear start of exactly one name ("maree" -> "MAREE Sky Lounge")
+            if len(k) >= 4:
+                hits = {
+                    id(e): e
+                    for d in (self.by_title, self.by_term)
+                    for kk, e in d.items()
+                    if kk.startswith(k)
+                }
+                if len(hits) == 1:
+                    return next(iter(hits.values()))
         for k in keys:  # close spelling of the business name itself
             if len(k) >= 4:
                 hit = process.extractOne(k, list(self.by_title), scorer=fuzz.ratio, score_cutoff=92)
@@ -397,9 +407,17 @@ async def refresh_due(client: httpx.AsyncClient | None = None) -> list[str]:
                 data["month"] = costs.month_key()
                 _save(n["name"], data)
                 done.append(n["name"])
+                get_cache().set(f"catalog:error:{key(n['name'])}", None)
                 log.info("catalog %s: %d places", n["name"], len(data["entries"]))
             except Exception as e:  # noqa: BLE001 - keep last month's list
                 log.warning("catalog %s refresh failed: %s", n["name"], e)
+                detail = f"{type(e).__name__}: {e}"
+                if isinstance(e, httpx.HTTPStatusError):
+                    detail = f"HTTP {e.response.status_code} from {e.request.url.host}"
+                get_cache().set(
+                    f"catalog:error:{key(n['name'])}",
+                    {"at": costs.now().isoformat(timespec="minutes"), "error": detail[:300]},
+                )
     finally:
         if own:
             await client.aclose()
@@ -449,6 +467,7 @@ def status() -> list[dict]:
                 "fetched_at": d.get("fetched_at") if d else None,
                 "stale": d.get("stale") if d else None,
                 "source_url": d.get("source_url") if d else None,
+                "last_error": get_cache().get(f"catalog:error:{key(n['name'])}", ttl_s=FOREVER),
             }
         )
     return out

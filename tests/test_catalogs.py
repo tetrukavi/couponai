@@ -258,3 +258,26 @@ def test_htzone_and_swish_lists_used_for_my_coupons(tmp_path, monkeypatch):
     assert v.accepted_by == "list" and v.place_note == "בישיבה בלבד"
     golf = local_voucher.search(asyncio.run(normalize("Golf", allow_llm=False)))
     assert any(v.card_network == "נופשונית" and v.accepted_by == "list" for v in golf.vouchers)
+
+
+def test_prefix_of_exactly_one_name_matches():
+    entries = [
+        {"title": "מסעדת מארי", "terms": ["MAREE Sky Lounge"], "site": None},
+        {"title": "Maria Bar", "terms": [], "site": None},
+        {"title": "Golf", "terms": [], "site": None},
+        {"title": "Golfito", "terms": [], "site": None},
+    ]
+    idx = catalogs.CatalogIndex("x", entries)
+    assert idx.find(["MAREE"])["title"] == "מסעדת מארי"
+    assert idx.find(["Golf"])["title"] == "Golf"  # exact title still wins
+    assert idx.find(["Golfi"])["title"] == "Golfito"
+    assert idx.find(["Mar"]) is None  # too short / ambiguous
+
+
+def test_failed_download_reason_is_recorded():
+    refresh([], fail=True)
+    st = {s["network"]: s for s in catalogs.status()}
+    assert st["BuyMe ALL"]["last_error"]["error"] == "HTTP 503 from buyme.co.il"
+    refresh([])
+    st = {s["network"]: s for s in catalogs.status()}
+    assert st["BuyMe ALL"]["last_error"] is None
