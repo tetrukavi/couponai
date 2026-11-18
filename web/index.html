@@ -338,15 +338,6 @@
       </label>
       <a href="/api/coupons/export.csv" class="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">Export CSV backup ↓</a>
     </div>
-    <template x-if="catalogList.length">
-      <p class="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-600 dark:bg-ink-800 dark:text-slate-300">
-        Official card lists:
-        <template x-for="(c, i) in catalogList" :key="c.network">
-          <span><span x-show="i">, </span><a :href="c.source_url" target="_blank" rel="noopener noreferrer" class="font-medium hover:underline" x-text="c.network"></a>
-            <span x-text="'(' + c.places.toLocaleString() + ' places, ' + shortDate(c.fetched_at) + ')'"></span></span>
-        </template>. Updated every month.
-      </p>
-    </template>
     <template x-if="!couponsLoaded"><div class="space-y-2"><div class="h-20 rounded-2xl shimmer"></div><div class="h-20 rounded-2xl shimmer"></div></div></template>
     <template x-if="couponsLoaded && !visibleCoupons().length">
       <div class="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-ink-700 dark:text-slate-400">No coupons yet. Tap <b>Add coupon</b>.</div>
