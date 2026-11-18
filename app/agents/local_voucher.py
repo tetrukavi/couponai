@@ -202,6 +202,7 @@ def match_voucher(
                 "accepted_by": "list",
                 "place": place["title"],
                 "online_redeem": place.get("online"),
+                "place_note": place.get("note"),
             },
         )
 

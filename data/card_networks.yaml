@@ -36,13 +36,16 @@ networks:
     catalog: {provider: buyme, id: 17573615}
     stores: []
   - name: chefZone
-    aliases: [Chef Zone, שף זון, צ'ף זון]
+    aliases: [Chef Zone, שף זון, שף-זון, צ'ף זון]
+    catalog: {provider: htzone, id: 1}  # htzone.co.il/voucher-zone/1
     stores: []
   - name: giftZone
-    aliases: [Gift Zone, גיפט זון]
+    aliases: [Gift Zone, גיפט זון, גיפט-זון]
+    catalog: {provider: htzone, id: 4}
     stores: []
   - name: SpaZone
-    aliases: [Spa Zone, ספא זון]
+    aliases: [Spa Zone, ספא זון, ספא-זון]
+    catalog: {provider: htzone, id: 3}
     stores: []
   - name: Dream Card
     aliases: [דרים קארד, DreamCard, DREAM CARD, Dream Gift Card]
@@ -52,7 +55,8 @@ networks:
              Laline, Ruby Bay, The Children's Place, Billabong, Quiksilver, Sunglass Hut,
              Flying Tiger Copenhagen, Itay Brands, Jumbo, Dyson]
   - name: נופשונית
-    aliases: [Nofshonit, נופשונית VIP]
+    aliases: [Nofshonit, נופשונית VIP, Swish Plus, סוויש פלוס, Swish]
+    catalog: {provider: swish, id: 105379}  # Nofshonit is now Swish Plus
     stores: []
   - name: Shopping Card
     aliases: [שופינג קארד, כרטיס שופינג]

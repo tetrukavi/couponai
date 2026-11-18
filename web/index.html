@@ -206,6 +206,7 @@
               </a>
               <p x-show="v.accepted_by === 'list'" class="mt-2 text-[11px] text-white/90" dir="auto"
                  x-text="'✓ On ' + (v.card_network || 'the card') + '\'s official list' + (v.place ? ' as ' + v.place : '') + (v.online_redeem ? ' · online too' : '')"></p>
+              <p x-show="v.place_note" class="mt-1 text-[11px] text-white/75" dir="auto" x-text="'ℹ ' + v.place_note"></p>
               <p x-show="v.accepted_by === 'store site'" class="mt-2 text-[11px] text-white/80">✓ The store's website says it takes this card</p>
               <p x-show="v.notes" class="mt-2 line-clamp-2 text-[11px] text-white/80" dir="auto" x-text="v.notes"></p>
             </article>

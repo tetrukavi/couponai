@@ -45,6 +45,7 @@ class Voucher(BaseModel):
     accepted_by: str | None = None  # "list" (the card's official list) | "store site"
     place: str | None = None  # the business's name on the card's list
     online_redeem: bool | None = None
+    place_note: str | None = None  # the list's redemption terms, e.g. "dine-in only"
     days_to_expiry: int | None = None
 
     def for_llm(self) -> dict[str, Any]:

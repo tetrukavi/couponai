@@ -159,3 +159,102 @@ def test_dream_card_matches_fox_group_brands_as_verify():
 
     store = asyncio.run(norm("פליינג טייגר", allow_llm=False))
     assert store.canonical == "Flying Tiger Copenhagen"
+
+
+# ---- HitechZone and Swish pages (Next.js data embedded in the HTML) ----
+
+
+def next_page(data: dict) -> str:
+    """Build HTML the way Next.js embeds data: JSON split across __next_f.push chunks."""
+    text = 'x:{"page":' + json.dumps(data, ensure_ascii=False) + "}"
+    half = len(text) // 2
+    return "".join(
+        f"<script>self.__next_f.push([1,{json.dumps(part, ensure_ascii=False)}])</script>"
+        for part in (text[:half], text[half:])
+    )
+
+
+def test_parse_htzone():
+    page = next_page({
+        "categories": [{"id": 15, "name": "מסעדות"}],
+        "businesses": [
+            {"id": 1, "name": "מסעדת מארי", "englishName": "MAREE Sky Lounge", "url": "https://maree.co.il/",
+             "termsHtml": "<b>המימוש בישיבה</b> במסעדה בלבד", "honorOnline": False, "categoryIds": [15]},
+            {"id": 2, "name": "ג'נספורט", "englishName": "$undefined", "url": "$undefined",
+             "termsHtml": "", "honorOnline": True, "categoryIds": []},
+        ],
+    })  # fmt: skip
+    d = catalogs.parse_htzone(page)
+    m, j = d["entries"]
+    assert m["title"] == "מסעדת מארי" and "MAREE Sky Lounge" in m["terms"]
+    assert m["note"] == "המימוש בישיבה במסעדה בלבד" and m["categories"] == ["מסעדות"]
+    assert j["online"] is True and j["site"] is None and j["terms"] == []
+    idx = catalogs.CatalogIndex("chefZone", d["entries"])
+    assert idx.find(["Maree Sky Lounge"])["title"] == "מסעדת מארי"
+
+
+def test_parse_swish_merges_online_and_store_variants():
+    page = next_page({"tags": [
+        {"tagName": "אופנה", "chainsByWallet": [
+            {"categoryNumber": 105379, "storeName": "שילב", "chainId": 1, "tagName": "אופנה",
+             "searchKeyWords": "shilav", "webSite": "https://shilav.co.il", "mustToKnow": None},
+            {"categoryNumber": 999, "storeName": "Other card only", "chainId": 9, "tagName": "אופנה"},
+        ]},
+        {"tagName": "רכישה אונליין", "chainsByWallet": [
+            {"categoryNumber": 105379, "storeName": "שילב אונליין", "chainId": 2,
+             "tagName": "רכישה אונליין", "mustToKnow": "<p>עד 1000 ש\"ח לעסקה</p>"},
+            {"categoryNumber": 105379, "storeName": "פוט לוקר אונליין", "chainId": 3,
+             "tagName": "רכישה אונליין"},
+        ]},
+    ]})  # fmt: skip
+    d = catalogs.parse_swish(page, "105379")
+    by = {e["title"]: e for e in d["entries"]}
+    assert set(by) == {"שילב", "פוט לוקר"}  # other cards' rows ignored, "אונליין" stripped
+    assert by["שילב"]["online"] and by["שילב"]["in_store"] and "shilav" in by["שילב"]["terms"]
+    assert by["פוט לוקר"]["online"] and not by["פוט לוקר"]["in_store"]
+    assert by["שילב"]["note"] == 'עד 1000 ש"ח לעסקה'
+
+
+def test_htzone_and_swish_lists_used_for_my_coupons(tmp_path, monkeypatch):
+    from app import coupon_store
+
+    coupon_store.add_coupon(coupon_store.CouponIn(card_network="chefZone", face_value=68))
+    coupon_store.add_coupon(coupon_store.CouponIn(card_network="נופשונית", face_value=630))
+    calls = []
+
+    def handler(req: httpx.Request):
+        calls.append(str(req.url))
+        if "htzone" in str(req.url):
+            return httpx.Response(200, text=next_page({"businesses": [
+                {"id": 1, "name": "מסעדת מארי", "englishName": "MAREE", "termsHtml": "בישיבה בלבד",
+                 "honorOnline": False, "categoryIds": []}]}))  # fmt: skip
+        if "swish" in str(req.url):
+            return httpx.Response(
+                200,
+                text=next_page(
+                    {
+                        "chainsByWallet": [
+                            {
+                                "categoryNumber": 105379,
+                                "storeName": "גולף",
+                                "chainId": 1,
+                                "tagName": "אופנה",
+                            }
+                        ]
+                    }
+                ),
+            )
+        return httpx.Response(200, json=ALL if "/13438757/" in str(req.url) else FASHION)
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await catalogs.refresh_due(c)
+
+    done = asyncio.run(go())
+    assert {"chefZone", "נופשונית"} <= set(done)
+    assert any("voucher-zone/1" in u for u in calls) and any("product-105379" in u for u in calls)
+    maree = local_voucher.search(asyncio.run(normalize("MAREE", allow_llm=False)))
+    [v] = [v for v in maree.vouchers if v.card_network == "chefZone"]
+    assert v.accepted_by == "list" and v.place_note == "בישיבה בלבד"
+    golf = local_voucher.search(asyncio.run(normalize("Golf", allow_llm=False)))
+    assert any(v.card_network == "נופשונית" and v.accepted_by == "list" for v in golf.vouchers)

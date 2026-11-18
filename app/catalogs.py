@@ -11,6 +11,7 @@ checking "does Selas take BuyMe ALL?" is instant, exact and free (no AI involved
 """
 
 import asyncio
+import html as html_lib
 import json
 import logging
 import re
@@ -108,7 +109,142 @@ async def fetch_buyme(network_id: str, client: httpx.AsyncClient) -> dict:
     return {**parsed, "source_url": f"https://buyme.co.il/brands/{network_id}"}
 
 
-PROVIDERS = {"buyme": fetch_buyme}
+# --- pages built with Next.js embed their data in `self.__next_f.push([1, "..."])` scripts ---
+
+_DEC = json.JSONDecoder()
+
+
+def next_payload(page_html: str) -> str:
+    chunks = re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', page_html, re.S)
+    return "".join(json.loads('"' + c + '"') for c in chunks)
+
+
+def json_values_after(payload: str, key: str):
+    """Every JSON value that follows `"key":` in the payload."""
+    needle = f'"{key}":'
+    i = 0
+    while (i := payload.find(needle, i)) != -1:
+        j = i + len(needle)
+        while j < len(payload) and payload[j].isspace():
+            j += 1
+        try:
+            val, end = _DEC.raw_decode(payload, j)
+        except json.JSONDecodeError:
+            i = j
+            continue
+        yield val
+        i = end
+
+
+def _clean(v) -> str | None:
+    if not isinstance(v, str) or v in ("$undefined", "null"):
+        return None
+    v = html_lib.unescape(re.sub(r"<[^>]+>", " ", v))
+    v = re.sub(r"\s+", " ", v).strip()
+    return v or None
+
+
+async def _get_page(url: str, client: httpx.AsyncClient) -> str:
+    r = await client.get(url)
+    r.raise_for_status()
+    return r.text
+
+
+# --- HitechZone voucher zones (chefZone, SpaZone, giftZone...) ---
+
+
+def parse_htzone(page_html: str) -> dict:
+    payload = next_payload(page_html)
+    lists = [x for x in json_values_after(payload, "businesses") if isinstance(x, list) and x]
+    if not lists:
+        return {"supplier": None, "entries": []}
+    businesses = max(lists, key=len)
+    cat_names = {}
+    for cats in json_values_after(payload, "categories"):
+        if isinstance(cats, list):
+            cat_names.update(
+                {c["id"]: c["name"] for c in cats if isinstance(c, dict) and "id" in c}
+            )
+    entries = []
+    for b in businesses:
+        name = _clean(b.get("name"))
+        if not name:
+            continue
+        english = _clean(b.get("englishName"))
+        entries.append(
+            {
+                "id": str(b.get("id")),
+                "title": name,
+                "terms": _with_parts([english] if english else []),
+                "online": bool(b.get("honorOnline")),
+                "site": _clean(b.get("url")),
+                "categories": sorted(
+                    {cat_names[c] for c in b.get("categoryIds") or [] if c in cat_names}
+                ),
+                "note": (_clean(b.get("termsHtml")) or "")[:300] or None,
+            }
+        )
+    return {"supplier": None, "entries": entries}
+
+
+async def fetch_htzone(zone_id: str, client: httpx.AsyncClient) -> dict:
+    url = f"https://www.htzone.co.il/voucher-zone/{zone_id}"  # allowed; their /api/ is not used
+    parsed = parse_htzone(await _get_page(url, client))
+    if not parsed["entries"]:
+        raise ValueError("empty merchant list")
+    return {**parsed, "source_url": url}
+
+
+# --- Swish gift cards (formerly Nofshonit) ---
+
+_ONLINE_SUFFIX = re.compile(r"\s*[-–]?\s*(אונליין|און ליין|online)\s*$", re.I)
+
+
+def parse_swish(page_html: str, product_id: str) -> dict:
+    payload = next_payload(page_html)
+    rows = [
+        r
+        for arr in json_values_after(payload, "chainsByWallet")
+        if isinstance(arr, list)
+        for r in arr
+        if isinstance(r, dict) and str(r.get("categoryNumber")) == str(product_id)
+    ]
+    merged: dict[str, dict] = {}
+    for r in rows:
+        raw = _clean(r.get("storeName"))
+        if not raw:
+            continue
+        is_online = bool(_ONLINE_SUFFIX.search(raw)) or r.get("tagName") == "רכישה אונליין"
+        title = _ONLINE_SUFFIX.sub("", raw).strip() or raw
+        e = merged.setdefault(
+            key(title),
+            {"id": str(r.get("chainId")), "title": title, "terms": [], "online": False,
+             "in_store": False, "site": None, "categories": set(), "note": None},
+        )  # fmt: skip
+        e["terms"] += [raw, *(_terms(r.get("searchKeyWords") or ""))]
+        e["online"] |= is_online
+        e["in_store"] |= not is_online
+        e["site"] = e["site"] or _clean(r.get("webSite"))
+        if r.get("tagName") and r["tagName"] != "רכישה אונליין":
+            e["categories"].add(r["tagName"])
+        e["note"] = e["note"] or ((_clean(r.get("mustToKnow")) or "")[:300] or None)
+    entries = []
+    for e in merged.values():
+        e["terms"] = _with_parts(list(dict.fromkeys(e["terms"])))
+        e["categories"] = sorted(e["categories"])
+        entries.append(e)
+    return {"supplier": None, "entries": entries}
+
+
+async def fetch_swish(product_id: str, client: httpx.AsyncClient) -> dict:
+    url = f"https://swish.co.il/home/family-time-giftcard/product-{product_id}"
+    parsed = parse_swish(await _get_page(url, client), product_id)
+    if not parsed["entries"]:
+        raise ValueError("empty merchant list")
+    return {**parsed, "source_url": url}
+
+
+PROVIDERS = {"buyme": fetch_buyme, "htzone": fetch_htzone, "swish": fetch_swish}
 
 
 # ---------- storage ----------
