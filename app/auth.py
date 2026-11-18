@@ -79,6 +79,11 @@ def read_session(token: str | None, now: float | None = None) -> str | None:
     return user
 
 
+def token_fingerprint(token: str) -> str | None:
+    """One-way fingerprint (8 hex of SHA-256): compare tokens without revealing them."""
+    return hashlib.sha256(token.encode()).hexdigest()[:8] if token else None
+
+
 # ---------- request -> user ----------
 
 

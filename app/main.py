@@ -98,8 +98,11 @@ async def logout() -> JSONResponse:
 
 @app.get("/api/health")
 async def health(request: Request) -> JSONResponse:
-    if not request.state.user:  # public: used by the host's health check, reveals nothing
-        return JSONResponse({"ok": True})
+    if not request.state.user:  # public: used by the host's health check, reveals nothing secret
+        # one-way fingerprint so the owner can check the server got the right API token
+        return JSONResponse(
+            {"ok": True, "api_token": auth.token_fingerprint(get_settings().api_token)}
+        )
     s = get_settings()
     vouchers = local_voucher.load_vouchers()
     return JSONResponse(

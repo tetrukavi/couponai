@@ -43,7 +43,7 @@ def test_everything_private_without_login(login_on):
     r = c.get("/", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
     assert c.get("/login").status_code == 200
-    assert c.get("/api/health").json() == {"ok": True}  # reveals nothing
+    assert c.get("/api/health").json() == {"ok": True, "api_token": None}  # nothing secret
 
 
 def test_login_flow_and_names(login_on):
@@ -105,3 +105,8 @@ def test_server_refuses_to_start_misconfigured(monkeypatch):
     get_settings.cache_clear()
     with pytest.raises(auth.ConfigError):
         auth.check_config()
+
+
+def test_token_fingerprint_is_one_way():
+    fp = auth.token_fingerprint("t" * 40)
+    assert len(fp) == 8 and "t" not in fp and auth.token_fingerprint("") is None
