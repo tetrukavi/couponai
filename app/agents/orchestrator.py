@@ -33,7 +33,9 @@ FOREVER = 10**9  # month-keyed entries never expire by TTL; the month in the key
 
 
 def default_workers() -> list[tuple[SourceSpec, Worker]]:
-    held = local_voucher.held_networks()
+    from app import catalogs
+
+    held = [n for n in local_voucher.held_networks() if not catalogs.catalog_config(n)]
     workers: list[tuple[SourceSpec, Worker]] = [
         (
             SourceSpec(

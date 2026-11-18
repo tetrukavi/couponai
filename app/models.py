@@ -16,7 +16,7 @@ class NormalizedStore(BaseModel):
     aliases: list[str] = []
     domain: str | None = None
     category: str | None = None
-    method: Literal["exact", "fuzzy", "llm", "raw"] = "raw"
+    method: Literal["exact", "fuzzy", "catalog", "llm", "raw"] = "raw"
 
 
 class Voucher(BaseModel):
@@ -40,8 +40,11 @@ class Voucher(BaseModel):
     used_by: str | None = None
     # filled by the matcher
     match: Literal["direct", "network"] | None = None
-    # for network vouchers: what the store's website said ("yes" | "no" | "unknown")
+    # for network vouchers: "yes" | "no" | "unknown" | "not_listed"
     accepted: str | None = None
+    accepted_by: str | None = None  # "list" (the card's official list) | "store site"
+    place: str | None = None  # the business's name on the card's list
+    online_redeem: bool | None = None
     days_to_expiry: int | None = None
 
     def for_llm(self) -> dict[str, Any]:

@@ -130,7 +130,7 @@ def card_networks() -> list[dict]:
     return _networks(p, p.stat().st_mtime) if p.exists() else []
 
 
-def _network_entry(name: str | None) -> dict | None:
+def network_entry(name: str | None) -> dict | None:
     if not name:
         return None
     k = key(name)
@@ -154,7 +154,7 @@ def network_keys(name: str | None) -> set[str]:
     """All comparison keys for a card network: its own name + aliases from card_networks.yaml."""
     if not name:
         return set()
-    net = _network_entry(name)
+    net = network_entry(name)
     names = [name, *([net["name"], *net.get("aliases", [])] if net else [])]
     return {key(x) for x in names} - {""}
 
@@ -172,27 +172,48 @@ def acceptance_map(accepted_networks: list[dict] | None) -> dict[str, str]:
 
 def match_voucher(
     v: Voucher, store: NormalizedStore, accepted: dict[str, str] | None = None
-) -> tuple[str | None, str | None]:
-    """Returns (match, acceptance). match: "direct" | "network" | None.
+) -> tuple[str | None, str | None, dict]:
+    """Returns (match, acceptance, extra). match: "direct" | "network" | None.
 
-    A network voucher matches when the store's website confirmed the network ("yes"), or when
-    the seed list says the store takes it and the website didn't say "no".
+    For a gift-card network, the network's official merchant list (app/catalogs.py) decides
+    when we have it. Otherwise: the store's website confirmed it ("yes"), or the seed list
+    says the store takes it and the website didn't say "no".
     """
     store_keys = {key(x) for x in [store.canonical, *store.aliases]} - {""}
     for n in [*v.valid_stores, v.issuer]:
         nk = key(n)
         if nk in store_keys or any(fuzz.ratio(nk, sk) >= 92 for sk in store_keys):
-            return "direct", None
+            return "direct", None, {}
     if not v.card_network:
-        return None, None
+        return None, None, {}
+
+    from app import catalogs
+
+    has_list, place = catalogs.lookup(
+        v.card_network, [store.canonical, *store.aliases, store.query], store.domain
+    )
+    if has_list:
+        if place is None:
+            return None, "not_listed", {}
+        return (
+            "network",
+            "yes",
+            {
+                "accepted_by": "list",
+                "place": place["title"],
+                "online_redeem": place.get("online"),
+            },
+        )
+
     status = next(
         (accepted[k] for k in network_keys(v.card_network) if k in (accepted or {})), None
     )
-    net = _network_entry(v.card_network)
+    net = network_entry(v.card_network)
     seeded = bool(net) and key(store.canonical) in {key(s) for s in net.get("stores", [])}
+    extra = {"accepted_by": "store site"} if status == "yes" else {}
     if status == "yes" or (seeded and status != "no"):
-        return "network", status
-    return None, status
+        return "network", status, extra
+    return None, status, {}
 
 
 def held_networks(today: date | None = None) -> list[str]:
@@ -233,11 +254,12 @@ def search(
     today = today or date.today()
     accepted = acceptance_map(accepted_networks)
     found: list[Voucher] = []
-    skipped = rejected = 0
+    skipped = rejected = not_listed = 0
     for v in load_vouchers():
-        m, status = match_voucher(v, store, accepted)
+        m, status, extra = match_voucher(v, store, accepted)
         if not m:
             rejected += status == "no" and is_usable(v, today)
+            not_listed += status == "not_listed" and is_usable(v, today)
             continue
         if not is_usable(v, today):
             skipped += 1
@@ -247,6 +269,7 @@ def search(
                 update={
                     "match": m,
                     "accepted": status,
+                    **extra,
                     "days_to_expiry": (v.expiry_date - today).days if v.expiry_date else None,
                 }
             )
@@ -263,6 +286,10 @@ def search(
     notes = []
     if skipped:
         notes.append(f"{skipped} matching voucher(s) hidden: expired or used up")
+    if not_listed:
+        notes.append(
+            f"{not_listed} gift card(s) hidden: this store isn't on the card's official list"
+        )
     if rejected:
         notes.append(f"{rejected} voucher(s) hidden: the store's website says it doesn't take them")
     if any(v.match == "network" and v.accepted != "yes" for v in found):

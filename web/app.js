@@ -68,6 +68,7 @@ window.couponApp = function () {
     toast: null,
     online: null,
     editing: {},
+    catalogList: [],
     editError: {},
     refreshArmed: false,
 
@@ -183,7 +184,12 @@ window.couponApp = function () {
       return `--c1:${a};--c2:${b}`;
     },
     // ---------- My coupons ----------
-    openCoupons() { this.tab = 'coupons'; this.loadCoupons(); },
+    openCoupons() {
+      this.tab = 'coupons';
+      this.loadCoupons();
+      fetch('/api/catalogs').then(r => r.json())
+        .then(l => { this.catalogList = l.filter(c => c.places > 0); }).catch(() => {});
+    },
     async loadCoupons() {
       try {
         this.coupons = await (await fetch('/api/coupons')).json();

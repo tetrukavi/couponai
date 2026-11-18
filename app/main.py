@@ -1,9 +1,11 @@
 """FastAPI entry point: SSE search stream + static single-page UI."""
 
+import asyncio
 import csv
 import io
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal
 
@@ -18,7 +20,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import auth, costs, coupon_store
+from app import auth, catalogs, costs, coupon_store
 from app.agents import coupon_reader, local_voucher, orchestrator
 from app.agents.local_voucher import card_networks, is_usable
 from app.agents.normalizer import store_index
@@ -29,7 +31,26 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 auth.check_config()  # refuse to start a server that should have a login but doesn't
 
-app = FastAPI(title="couponAI", docs_url=None, redoc_url=None, openapi_url=None)
+_background: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:
+    t = asyncio.create_task(coro)
+    _background.add(t)
+    t.add_done_callback(_background.discard)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # gift-card merchant lists: download this month's on startup, then re-check every few hours
+    if get_settings().catalog_refresh:
+        _spawn(catalogs.refresh_loop())
+    yield
+    for t in list(_background):
+        t.cancel()
+
+
+app = FastAPI(title="couponAI", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 WEB = ROOT / "web"
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 
@@ -185,6 +206,12 @@ async def coupons() -> JSONResponse:
     return JSONResponse(out)
 
 
+@app.get("/api/catalogs")
+async def catalog_status() -> JSONResponse:
+    """Which gift-card merchant lists are downloaded, how big, and when."""
+    return JSONResponse(catalogs.status())
+
+
 @app.get("/api/networks")
 async def networks() -> JSONResponse:
     return JSONResponse([n["name"] for n in card_networks()])
@@ -193,6 +220,8 @@ async def networks() -> JSONResponse:
 @app.post("/api/coupons", status_code=201)
 async def add_coupon(c: coupon_store.CouponIn, request: Request) -> JSONResponse:
     v = coupon_store.add_coupon(c, user=request.state.user)
+    if v.card_network and get_settings().catalog_refresh:
+        _spawn(catalogs.refresh_due())  # a new gift card: fetch its list now, not in 6 hours
     return JSONResponse(v.model_dump(mode="json"), status_code=201)
 
 

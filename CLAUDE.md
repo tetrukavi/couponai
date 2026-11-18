@@ -38,6 +38,11 @@ the best way to pay. Built for speed: the user is standing at a checkout counter
    and refuses to start without `COUPONAI_USERS` + `COUPONAI_SECRET_KEY`. Every `/api/*` route
    except `/api/login` and `/api/health` requires a session (see `app/auth.py`). Don't weaken this.
 
+10. **Outside data fetches are read-only and polite.** The only non-AI outside requests are the
+    gift-card merchant lists (`app/catalogs.py`): plain GET of public pages allowed by the site's
+    robots.txt, honest User-Agent, at most once per network per calendar month, only for networks
+    we hold coupons for. Never send user data to these sites. If a list fails, keep last month's.
+
 ## Stack
 
 - Python 3.12, FastAPI + uvicorn, asyncio fan-out with per-worker timeouts, SSE streaming
@@ -56,6 +61,7 @@ the best way to pay. Built for speed: the user is standing at a checkout counter
 - `data/vouchers/`: the user's `.xlsx` / `.csv` files (sample: `my_vouchers.xlsx`)
 - `data/store_aliases.yaml`, `data/card_networks.yaml`: normalization & card-network seeds
 - `data/clubs.yaml`: which clubs to check and which connector each uses
+- `app/catalogs.py`: official merchant lists of gift-card networks (BuyMe…), refreshed monthly
 - `app/coupon_store.py`: app-added coupons (SQLite); `app/agents/coupon_reader.py`: screenshot → form draft
 - Haiku 5.5 workers use the basic web tools (`web_search_20250305` / `web_fetch_20250910`);
   the `*_20260209` versions only work on Opus/Sonnet 4.6+ (configurable in `app/config.py`)

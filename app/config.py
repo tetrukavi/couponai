@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # private club list as JSON (overrides data/clubs.local.yaml and data/clubs.yaml)
     clubs: list[dict] | None = None
 
+    # download gift-card merchant lists monthly in the background (app/catalogs.py)
+    catalog_refresh: bool = True
+
     # ---- login (see app/auth.py) ----
     # {"Name": "<hash from scripts/hash_password.py>", ...}. Empty = no login (local use only).
     users: dict[str, str] = Field(default_factory=dict)

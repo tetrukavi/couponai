@@ -1,12 +1,15 @@
 # Multi-store gift-card networks -> stores that (probably) accept them.
-# SEED DATA, UNVERIFIED: the web agent re-checks acceptance online on every search.
-# Network matches are therefore shown as "verify" until the store-site agent confirms.
+# `stores` is SEED DATA, UNVERIFIED. Where a network publishes its official merchant list,
+# `catalog` points to it: couponAI downloads it monthly and it overrides `stores`
+# (see app/catalogs.py). Other networks are confirmed by the store-site web search.
 networks:
   - name: BuyMe ALL
-    aliases: [ביימי, BuyMe, ביי מי]
+    aliases: [ביימי, BuyMe, ביי מי, ביימי אול, BUYME ALL]
+    catalog: {provider: buyme, id: 13438757}
     stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle, Super-Pharm, KSP, IKEA, ACE, Home Center]
   - name: BuyMe Fashion
-    aliases: [ביימי אופנה]
+    aliases: [ביימי אופנה, BuyMe Fashion & Beauty, BUYME FASHION & BEAUTY]
+    catalog: {provider: buyme, id: 20620}
     stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle]
   - name: Max Gift Card
     aliases: [מקס גיפט קארד, כרטיס מתנה מקס]
@@ -17,7 +20,20 @@ networks:
   # Networks without a seed store list: they show up for a store only after the store's
   # website confirms it accepts them (or for stores you add to `stores` here).
   - name: BuyMe Foody
-    aliases: [ביימי פודי, Foody, BuyMe Foodie]
+    aliases: [ביימי פודי, BuyMe Foodie, BUYME FOODY]
+    catalog: {provider: buyme, id: 17573460}
+    stores: []
+  - name: BuyMe Chef
+    aliases: [ביימי שף, BUYME CHEF]
+    catalog: {provider: buyme, id: 752649}
+    stores: []
+  - name: BuyMe Vacation & Spa
+    aliases: [ביימי ספא, BUYME VACATION & SPA]
+    catalog: {provider: buyme, id: 17573505}
+    stores: []
+  - name: BuyMe Brunch
+    aliases: [ביימי בראנץ', BUYME BRUNCH]
+    catalog: {provider: buyme, id: 17573615}
     stores: []
   - name: chefZone
     aliases: [Chef Zone, שף זון, צ'ף זון]

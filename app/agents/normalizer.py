@@ -151,10 +151,38 @@ async def _llm_normalize(query: str) -> NormalizedStore | None:
     return StoreIndex([entry]).to_store(query, entry, "llm")
 
 
+def _catalog_store(query: str) -> NormalizedStore | None:
+    """A business on one of the downloaded gift-card lists (exact name/search-term match)."""
+    from app import catalogs
+
+    for idx in catalogs.all_indexes():
+        e = idx.find([query])
+        if e:
+            # the list's name, unless it's a long description ("selected branches of X")
+            long_title = len(e["title"].split()) > 3
+            canonical = query if long_title and plausible_alias(query, [e["title"]]) else e["title"]
+            aliases = [e["title"], *[t for t in e["terms"] if plausible_alias(t, [e["title"]])]]
+            return NormalizedStore(
+                query=query,
+                canonical=canonical,
+                aliases=sorted(set(aliases) - {canonical})[:20],
+                domain=catalogs._host(e.get("site")),
+                category=(e.get("categories") or [None])[0],
+                method="catalog",
+            )
+    return None
+
+
 async def normalize(query: str, *, allow_llm: bool = True) -> NormalizedStore:
     """allow_llm=False keeps this free (no API call) for searches the user hasn't paid for."""
     query = query.strip()
-    hit = store_index().lookup(query)
+    idx = store_index()
+    k = key(query)
+    if k and k in idx.by_key:
+        return idx.to_store(query, idx.by_key[k], "exact")
+    if hit := _catalog_store(query):
+        return hit
+    hit = idx.lookup(query)  # fuzzy against our own store list
     if hit:
         return hit
     if allow_llm and get_settings().llm_enabled:
