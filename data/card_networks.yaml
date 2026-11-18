@@ -45,8 +45,12 @@ networks:
     aliases: [Spa Zone, ספא זון]
     stores: []
   - name: Dream Card
-    aliases: [דרים קארד, DreamCard, DREAM CARD]
-    stores: []
+    aliases: [דרים קארד, DreamCard, DREAM CARD, Dream Gift Card]
+    # Fox group brands listed on dreamcard.co.il ("המותגים שלנו"); the site doesn't say the
+    # gift card works at every one, so matches show as "Verify" unless the store confirms.
+    stores: [Fox, Fox Home, Foot Locker, Mango, American Eagle, Aerie, Terminal X, Shilav,
+             Laline, Ruby Bay, The Children's Place, Billabong, Quiksilver, Sunglass Hut,
+             Flying Tiger Copenhagen, Itay Brands, Jumbo, Dyson]
   - name: נופשונית
     aliases: [Nofshonit, נופשונית VIP]
     stores: []

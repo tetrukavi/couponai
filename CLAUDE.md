@@ -84,7 +84,7 @@ cp .env.example .env                        # then set ANTHROPIC_API_KEY
 python scripts/make_sample_vouchers.py      # regenerate the sample xlsx
 uvicorn app.main:app --reload               # http://127.0.0.1:8000
 pytest -q                                   # tests; LLM calls are mocked
-docker build -t couponai . && docker run --rm --entrypoint python couponai -c "import app.main"  # image starts
+docker build -t couponai . && docker run --rm -e COUPONAI_REQUIRE_LOGIN=false --entrypoint python couponai -c "import app.main"  # image starts
 ruff check . && ruff format .
 ```
 

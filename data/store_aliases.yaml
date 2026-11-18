@@ -22,3 +22,16 @@ stores:
   - {canonical: Home Center, aliases: [הום סנטר], category: home}
   - {canonical: Max Stock, aliases: [מקס סטוק], category: home}
   - {canonical: Office Depot, aliases: [אופיס דיפו], category: office}
+  - {canonical: Fox Home, aliases: [פוקס הום, fox home], category: home}
+  - {canonical: Mango, aliases: [מנגו], category: fashion}
+  - {canonical: Aerie, aliases: [איירי], category: fashion}
+  - {canonical: Shilav, aliases: [שילב], category: baby}
+  - {canonical: Laline, aliases: [ללין], category: beauty}
+  - {canonical: Ruby Bay, aliases: [רובי ביי], category: fashion}
+  - {canonical: The Children's Place, aliases: [Childrens Place, צילדרנס פלייס], category: kids}
+  - {canonical: Billabong, aliases: [בילבונג], category: fashion}
+  - {canonical: Quiksilver, aliases: [קוויקסילבר, Quicksilver], category: fashion}
+  - {canonical: Sunglass Hut, aliases: [סאנגלאס האט], category: fashion}
+  - {canonical: Flying Tiger Copenhagen, aliases: [Flying Tiger, פליינג טייגר, טייגר], category: home}
+  - {canonical: Jumbo, aliases: [ג'מבו, ג'מבו יוון, Jumbo Greece], category: home}
+  - {canonical: Dyson, aliases: [דייסון], category: electronics}

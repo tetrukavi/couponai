@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 
 USER_AGENT = "couponAI/0.1 (personal use; fetches once a month)"
 FOREVER = 10**9
-REFRESH_EVERY_S = 6 * 3600  # the loop checks this often; downloads only when the month changed
+RETRY_AFTER_FAILURE_S = 6 * 3600  # if a download failed, try again this much later
 
 
 # ---------- providers ----------
@@ -270,13 +270,32 @@ async def refresh_due(client: httpx.AsyncClient | None = None) -> list[str]:
     return done
 
 
+def seconds_until_next_month(now=None) -> float:
+    """Until 00:05 on the 1st of next month, Israel time."""
+    now = now or costs.now()
+    first = now.replace(day=1, hour=0, minute=5, second=0, microsecond=0)
+    nxt = (
+        first.replace(year=now.year + 1, month=1)
+        if now.month == 12
+        else first.replace(month=now.month + 1)
+    )
+    return max(60.0, (nxt - now).total_seconds())
+
+
+def all_current() -> bool:
+    return all((d := stored(n["name"])) is not None and not d["stale"] for n in networks_to_fetch())
+
+
 async def refresh_loop() -> None:
+    """Download at startup if needed, then sleep until next month. Costs no AI tokens."""
     while True:
         try:
             await refresh_due()
         except Exception:  # noqa: BLE001
             log.exception("catalog refresh loop")
-        await asyncio.sleep(REFRESH_EVERY_S)
+        wait = seconds_until_next_month() if all_current() else RETRY_AFTER_FAILURE_S
+        log.info("catalogs: next check in %.1f hours", wait / 3600)
+        await asyncio.sleep(wait)
 
 
 def status() -> list[dict]:

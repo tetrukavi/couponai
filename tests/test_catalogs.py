@@ -141,3 +141,21 @@ def _clear_index_cache():
     catalogs._index_cache.clear()
     yield
     catalogs._index_cache.clear()
+
+
+def test_sleeps_until_next_month():
+    from datetime import datetime
+
+    nov18 = datetime(2026, 11, 18, 17, 0, tzinfo=costs.TZ)
+    assert round(catalogs.seconds_until_next_month(nov18) / 3600, 1) == round(
+        (12 * 24 + 7 + 5 / 60), 1
+    )
+    dec31 = datetime(2026, 12, 31, 23, 0, tzinfo=costs.TZ)
+    assert 3600 < catalogs.seconds_until_next_month(dec31) < 2 * 3600  # -> 1 Jan 2027
+
+
+def test_dream_card_matches_fox_group_brands_as_verify():
+    from app.agents.normalizer import normalize as norm
+
+    store = asyncio.run(norm("פליינג טייגר", allow_llm=False))
+    assert store.canonical == "Flying Tiger Copenhagen"
