@@ -31,15 +31,41 @@ ALL = {
 FASHION = {"supplier": {"name": "FASHION"}, "brands": [brand(9, "CASTRO", ["קסטרו"])]}
 
 
+OTHER = {"supplier": {"name": "OTHER"}, "brands": [brand(99, "Some Other Place", ["other"])]}
+
+
 def transport(calls, fail=False):
     def handler(req: httpx.Request):
-        calls.append(str(req.url))
+        url = str(req.url)
+        calls.append(url)
         if fail:
             return httpx.Response(503)
-        body = ALL if "/13438757/" in str(req.url) else FASHION
+        if "htzone" in url:
+            return httpx.Response(
+                200,
+                text=next_page(
+                    {
+                        "businesses": [
+                            {
+                                "id": 1,
+                                "name": "מסעדת מארי",
+                                "englishName": "MAREE",
+                                "termsHtml": "בישיבה בלבד",
+                                "honorOnline": False,
+                                "categoryIds": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+        body = ALL if "/13438757/" in url else FASHION if "/20620/" in url else OTHER
         return httpx.Response(200, json=body)
 
     return httpx.MockTransport(handler)
+
+
+def listed_networks() -> set[str]:
+    return {n["name"] for n in catalogs.networks_to_fetch()}
 
 
 def refresh(calls, fail=False):
@@ -68,11 +94,13 @@ def test_index_ignores_group_terms():
     assert idx.find(["x"], domain="https://www.fox.co.il")["title"] == "FOX"
 
 
-def test_monthly_refresh_only_held_networks():
+def test_monthly_refresh_downloads_every_list_once():
     calls = []
-    assert set(refresh(calls)) == {"BuyMe ALL", "BuyMe Fashion"}  # the sample holds these two
-    assert len(calls) == 2
-    assert refresh(calls) == [] and len(calls) == 2  # same month: nothing downloaded
+    every = listed_networks()
+    assert {"BuyMe ALL", "BuyMe Kosher", "chefZone", "All-in Zone"} <= every
+    assert "נופשונית" not in every and "Isracard GiftCard" not in every  # no downloadable list
+    assert set(refresh(calls)) == every and len(calls) == len(every)
+    assert refresh(calls) == [] and len(calls) == len(every)  # same month: nothing downloaded
 
 
 def test_new_month_refreshes_and_failure_keeps_last_list(monkeypatch):
@@ -85,7 +113,7 @@ def test_new_month_refreshes_and_failure_keeps_last_list(monkeypatch):
         catalogs.stored("BuyMe ALL")["stale"] is True
         and len(catalogs.stored("BuyMe ALL")["entries"]) == 4
     )
-    assert set(refresh(calls)) == {"BuyMe ALL", "BuyMe Fashion"}
+    assert set(refresh(calls)) == listed_networks()
     assert catalogs.stored("BuyMe ALL")["stale"] is False
 
 
@@ -116,13 +144,17 @@ def test_store_names_from_lists_are_recognized():
 def test_store_site_agent_not_asked_about_listed_networks(monkeypatch):
     captured = {}
 
-    async def fake_run(store, held):
+    async def fake_run(store, held, buyable=None):
         captured["held"] = held
+        captured["buyable"] = [n["name"] for n in buyable or []]
 
     monkeypatch.setattr(orchestrator.web_research, "run", fake_run)
     spec, fn = orchestrator.default_workers()[0]
     asyncio.run(fn(asyncio.run(normalize("Nike"))))
     assert "BuyMe ALL" not in captured["held"] and "Max Gift Card" in captured["held"]
+    # cards you don't hold and that have no list are checked by the store-site search
+    assert {"Isracard GiftCard", "ביחד בשבילך", "נופשונית"} <= set(captured["buyable"])
+    assert "BuyMe Kosher" not in captured["buyable"]  # has a list: checked for free instead
 
 
 def test_status_endpoint():
@@ -133,7 +165,8 @@ def test_status_endpoint():
     refresh([])
     st = {s["network"]: s for s in TestClient(app).get("/api/catalogs").json()}
     assert st["BuyMe ALL"]["places"] == 4 and st["BuyMe ALL"]["stale"] is False
-    assert st["BuyMe Foody"]["places"] == 0  # not held -> never downloaded
+    assert st["BuyMe Kosher"]["places"] == 1  # downloaded even though no coupon is held
+    assert "Isracard GiftCard" not in st  # no downloadable list
 
 
 @pytest.fixture(autouse=True)
@@ -215,49 +248,50 @@ def test_parse_swish_merges_online_and_store_variants():
     assert by["שילב"]["note"] == 'עד 1000 ש"ח לעסקה'
 
 
-def test_htzone_and_swish_lists_used_for_my_coupons(tmp_path, monkeypatch):
+def test_htzone_list_used_for_my_coupons():
     from app import coupon_store
 
     coupon_store.add_coupon(coupon_store.CouponIn(card_network="chefZone", face_value=68))
-    coupon_store.add_coupon(coupon_store.CouponIn(card_network="נופשונית", face_value=630))
-    calls = []
-
-    def handler(req: httpx.Request):
-        calls.append(str(req.url))
-        if "htzone" in str(req.url):
-            return httpx.Response(200, text=next_page({"businesses": [
-                {"id": 1, "name": "מסעדת מארי", "englishName": "MAREE", "termsHtml": "בישיבה בלבד",
-                 "honorOnline": False, "categoryIds": []}]}))  # fmt: skip
-        if "swish" in str(req.url):
-            return httpx.Response(
-                200,
-                text=next_page(
-                    {
-                        "chainsByWallet": [
-                            {
-                                "categoryNumber": 105379,
-                                "storeName": "גולף",
-                                "chainId": 1,
-                                "tagName": "אופנה",
-                            }
-                        ]
-                    }
-                ),
-            )
-        return httpx.Response(200, json=ALL if "/13438757/" in str(req.url) else FASHION)
-
-    async def go():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
-            return await catalogs.refresh_due(c)
-
-    done = asyncio.run(go())
-    assert {"chefZone", "נופשונית"} <= set(done)
-    assert any("voucher-zone/1" in u for u in calls) and any("product-105379" in u for u in calls)
+    refresh([])
     maree = local_voucher.search(asyncio.run(normalize("MAREE", allow_llm=False)))
     [v] = [v for v in maree.vouchers if v.card_network == "chefZone"]
     assert v.accepted_by == "list" and v.place_note == "בישיבה בלבד"
-    golf = local_voucher.search(asyncio.run(normalize("Golf", allow_llm=False)))
-    assert any(v.card_network == "נופשונית" and v.accepted_by == "list" for v in golf.vouchers)
+
+
+def test_cards_you_could_buy():
+    from app.agents import buyable
+
+    refresh([])
+    res = asyncio.run(buyable.run(asyncio.run(normalize("Selas", allow_llm=False))))
+    titles = [o.title for o in res.offers]
+    assert "BuyMe ALL works here" not in titles  # you already hold BuyMe ALL (sample V006)
+    res = asyncio.run(buyable.run(asyncio.run(normalize("MAREE", allow_llm=False))))
+    by = {o.title.split(" works")[0]: o for o in res.offers}
+    assert "chefZone" in by and by["chefZone"].where == "Buy at HitechZone (members)"
+    assert by["chefZone"].url == "https://www.htzone.co.il/voucher-zone/1"
+    assert "בישיבה בלבד" in by["chefZone"].terms and by["chefZone"].confidence == "high"
+    assert res.extra["checked_lists"] >= 10
+
+
+def test_store_site_yes_for_unheld_card_becomes_buy_offer(monkeypatch):
+    from app import llm
+    from app.agents import web_research
+
+    async def fake_research(task, prompt, **k):
+        assert "Isracard GiftCard" in prompt
+        return (
+            '```json\n{"summary": "s", "offers": [], "accepted_networks": ['
+            '{"name": "Isracard GiftCard", "accepted": "yes", "evidence_url": "https://zara.example/gift"}]}\n```',
+            [],
+            0.01,
+        )
+
+    monkeypatch.setattr(llm, "research", fake_research)
+    nets = [n for n in local_voucher.card_networks() if n["name"] == "Isracard GiftCard"]
+    res = asyncio.run(web_research.run(asyncio.run(normalize("Zara", allow_llm=False)), [], nets))
+    [o] = res.offers
+    assert o.title == "Isracard GiftCard works here" and o.where == "Buy at Isracard"
+    assert o.evidence_url == "https://zara.example/gift"
 
 
 def test_prefix_of_exactly_one_name_matches():

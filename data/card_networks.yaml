@@ -5,14 +5,17 @@
 networks:
   - name: BuyMe ALL
     aliases: [ביימי, BuyMe, ביי מי, ביימי אול, BUYME ALL]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/13438757"}
     catalog: {provider: buyme, id: 13438757}
     stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle, Super-Pharm, KSP, IKEA, ACE, Home Center]
   - name: BuyMe Fashion
     aliases: [ביימי אופנה, BuyMe Fashion & Beauty, BUYME FASHION & BEAUTY]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/20620"}
     catalog: {provider: buyme, id: 20620}
     stores: [Foot Locker, Nike, Adidas, Castro, Fox, Terminal X, Golf, Renuar, American Eagle]
   - name: Max Gift Card
     aliases: [מקס גיפט קארד, כרטיס מתנה מקס]
+    buy: {where: Max, url: "https://www.max.co.il/cards/giftcards"}
     stores: [Foot Locker, Nike, Castro, Fox, Super-Pharm, Shufersal, ACE, Home Center]
   - name: תו הזהב
     aliases: [Tav Hazahav, תו זהב]
@@ -21,34 +24,42 @@ networks:
   # website confirms it accepts them (or for stores you add to `stores` here).
   - name: BuyMe Foody
     aliases: [ביימי פודי, BuyMe Foodie, BUYME FOODY]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17573460"}
     catalog: {provider: buyme, id: 17573460}
     stores: []
   - name: BuyMe Chef
     aliases: [ביימי שף, BUYME CHEF]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/752649"}
     catalog: {provider: buyme, id: 752649}
     stores: []
   - name: BuyMe Vacation & Spa
     aliases: [ביימי ספא, BUYME VACATION & SPA]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17573505"}
     catalog: {provider: buyme, id: 17573505}
     stores: []
   - name: BuyMe Brunch
     aliases: [ביימי בראנץ', BUYME BRUNCH]
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17573615"}
     catalog: {provider: buyme, id: 17573615}
     stores: []
   - name: chefZone
     aliases: [Chef Zone, שף זון, שף-זון, צ'ף זון]
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/1"}
     catalog: {provider: htzone, id: 1}  # htzone.co.il/voucher-zone/1
     stores: []
   - name: giftZone
     aliases: [Gift Zone, גיפט זון, גיפט-זון]
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/4"}
     catalog: {provider: htzone, id: 4}
     stores: []
   - name: SpaZone
     aliases: [Spa Zone, ספא זון, ספא-זון]
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/3"}
     catalog: {provider: htzone, id: 3}
     stores: []
   - name: Dream Card
     aliases: [דרים קארד, DreamCard, DREAM CARD, Dream Gift Card]
+    buy: {where: Dream Card (Fox group), url: "https://www.dreamcard.co.il/"}
     # Fox group brands listed on dreamcard.co.il ("המותגים שלנו"); the site doesn't say the
     # gift card works at every one, so matches show as "Verify" unless the store confirms.
     stores: [Fox, Fox Home, Foot Locker, Mango, American Eagle, Aerie, Terminal X, Shilav,
@@ -56,8 +67,81 @@ networks:
              Flying Tiger Copenhagen, Itay Brands, Jumbo, Dyson]
   - name: נופשונית
     aliases: [Nofshonit, נופשונית VIP, Swish Plus, סוויש פלוס, Swish]
-    catalog: {provider: swish, id: 105379}  # Nofshonit is now Swish Plus
+    # Swish answers servers with HTTP 403, so no list download; the store-site search checks it.
+    buy: {where: Swish, url: "https://swish.co.il/home/family-time-giftcard/product-105379"}
     stores: []
   - name: Shopping Card
     aliases: [שופינג קארד, כרטיס שופינג]
+    stores: []
+
+  # ---- cards you could buy (checked for every store, even if you hold none) ----
+  - name: BuyMe Kosher
+    aliases: [ביימי כשר, BUYME KOSHER]
+    catalog: {provider: buyme, id: 4299680}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/4299680"}
+    stores: []
+  - name: BuyMe Baby
+    aliases: [ביימי בייבי, BUYME BABY]
+    catalog: {provider: buyme, id: 9018727}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/9018727"}
+    stores: []
+  - name: BuyMe Home Design
+    aliases: [ביימי הום דיזיין, BUYME HOME DESIGN]
+    catalog: {provider: buyme, id: 15490363}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/15490363"}
+    stores: []
+  - name: BuyMe YNG
+    aliases: [ביימי יאנג, BUYME YNG]
+    catalog: {provider: buyme, id: 15579925}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/15579925"}
+    stores: []
+  - name: BuyMe Moments
+    aliases: [ביימי מומנטס, BUYME MOMENTS]
+    catalog: {provider: buyme, id: 15925581}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/15925581"}
+    stores: []
+  - name: BuyMe Cheers
+    aliases: [ביימי צירס, BUYME CHEERS]
+    catalog: {provider: buyme, id: 17573995}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17573995"}
+    stores: []
+  - name: BuyMe Live
+    aliases: [ביימי לייב, BUYME LIVE]
+    catalog: {provider: buyme, id: 17574048}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17574048"}
+    stores: []
+  - name: BuyMe Pets
+    aliases: [ביימי פטס, BUYME PETS]
+    catalog: {provider: buyme, id: 17574524}
+    buy: {where: BuyMe, url: "https://buyme.co.il/supplier/17574524"}
+    stores: []
+  - name: Eat Zone
+    aliases: [EatZone, איט זון, איט-זון]
+    catalog: {provider: htzone, id: 5}
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/5"}
+    stores: []
+  - name: Super Zone
+    aliases: [SuperZone, סופר זון, סופר-זון]
+    catalog: {provider: htzone, id: 6}
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/6"}
+    stores: []
+  - name: Breakfast Zone
+    aliases: [BreakfastZone, ברקפסט זון]
+    catalog: {provider: htzone, id: 9}
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/9"}
+    stores: []
+  - name: All-in Zone
+    aliases: [AllinZone, Allin Zone, אולין זון, אול אין זון]
+    catalog: {provider: htzone, id: 10}
+    buy: {where: HitechZone (members), url: "https://www.htzone.co.il/voucher-zone/10"}
+    stores: []
+  # No downloadable list (blocked or app-only): the store-site AI search checks these.
+  - name: Isracard GiftCard
+    aliases: [ישראכרט גיפט קארד, גיפט קארד ישראכרט, Isracard Gift Card]
+    buy: {where: Isracard, url: "https://digital.isracard.co.il/"}
+    stores: []
+  - name: ביחד בשבילך
+    aliases: [Beyahad Bishvilha, ביחד בשבילך ההסתדרות, ארנק ביחד בשבילך]
+    buy: {where: Histadrut "ביחד בשבילך" wallet (members), url: "https://memberbenefits.histadrut.org.il/",
+          note: "Members load the wallet at a discount (reported 25%)", discount_pct: 25}
     stores: []

@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -18,5 +20,12 @@ def test_search_stream_sse():
         body = "".join(r.iter_text())
     events = [line[7:] for line in body.splitlines() if line.startswith("event: ")]
     assert events[0] == "normalized" and events[-1] == "done"
-    assert "local" in events and "source" not in events  # ask mode: nothing paid
+    assert "local" in events
+    # ask mode: only the free "cards you could buy" source runs; nothing paid
+    sources = [
+        json.loads(line[6:])["source"]
+        for line, prev in zip(body.splitlines()[1:], body.splitlines()[:-1], strict=True)
+        if prev == "event: source"
+    ]
+    assert sources == ["cards"]
     assert "online" in events and '"status": "unavailable"' in body

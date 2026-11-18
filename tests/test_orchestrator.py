@@ -148,9 +148,9 @@ async def test_free_sources_run_in_ask_mode():
     assert of(events, "online")[-1]["status"] == "saved"  # nothing needed paying
 
 
-async def test_default_workers_store_only_while_clubs_disabled():
+async def test_default_workers_store_and_cards_while_clubs_disabled():
     ids = [s.id for s, _ in orchestrator.default_workers()]
-    assert ids == ["store_site"]
+    assert ids == ["store_site", "cards"]
 
 
 def test_clubs_can_be_enabled():

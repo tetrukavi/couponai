@@ -34,15 +34,19 @@ FOREVER = 10**9  # month-keyed entries never expire by TTL; the month in the key
 
 def default_workers() -> list[tuple[SourceSpec, Worker]]:
     from app import catalogs
+    from app.agents import buyable
 
     held = [n for n in local_voucher.held_networks() if not catalogs.catalog_config(n)]
+    # cards you don't hold and that have no list: the store-site search checks them
+    no_list = [n for n in buyable.unheld_networks() if not catalogs.catalog_config(n["name"])]
     workers: list[tuple[SourceSpec, Worker]] = [
         (
             SourceSpec(
                 id=web_research.SOURCE_ID, label=web_research.LABEL, kind="store", needs_llm=True
             ),
-            lambda st: web_research.run(st, held),
-        )
+            lambda st: web_research.run(st, held, no_list),
+        ),
+        (SourceSpec(id=buyable.SOURCE_ID, label=buyable.LABEL, kind="store"), buyable.run),
     ]
     for c in build_connectors():
         workers.append(

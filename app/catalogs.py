@@ -17,7 +17,6 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date
 from urllib.parse import urlparse
 
 import httpx
@@ -371,16 +370,10 @@ def all_indexes() -> list[CatalogIndex]:
 
 
 def networks_to_fetch() -> list[dict]:
-    """Networks with a catalog that you hold usable coupons for."""
-    from app.agents.local_voucher import held_networks, network_entry
+    """Every network with an official list, held or not (to suggest cards you could buy)."""
+    from app.agents.local_voucher import card_networks
 
-    out, seen = [], set()
-    for name in held_networks(date.today()):
-        net = network_entry(name)
-        if net and catalog_config(net["name"]) and net["name"] not in seen:
-            seen.add(net["name"])
-            out.append(net)
-    return out
+    return [n for n in card_networks() if catalog_config(n["name"])]
 
 
 async def refresh_due(client: httpx.AsyncClient | None = None) -> list[str]:

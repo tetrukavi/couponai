@@ -18,14 +18,19 @@ EXTRA = """,
   ]"""
 
 
-async def run(store: NormalizedStore, held_networks: list[str]) -> SourceResult:
+async def run(
+    store: NormalizedStore, held_networks: list[str], buyable: list[dict] | None = None
+) -> SourceResult:
     names = ", ".join([store.canonical, *store.aliases])
     hint = f" (website hint: {store.domain})" if store.domain else ""
     held = ", ".join(held_networks) or "none"
+    buyable = buyable or []
+    to_buy = ", ".join(n["name"] for n in buyable) or "none"
     prompt = (
         f"Store: {names}{hint}, in Israel.\n"
         f"1. Which gift cards / voucher networks does this store accept? Explicitly check each of "
         f"these, which the user owns: {held}.\n"
+        f"   Also check these popular gift cards the user could buy: {to_buy}.\n"
         f"   In accepted_networks, use exactly these names (one entry each).\n"
         f"2. Any current promotions or coupon codes on the store's own site?\n\n"
         f"{output_format(EXTRA)}"
@@ -34,6 +39,15 @@ async def run(store: NormalizedStore, held_networks: list[str]) -> SourceResult:
     data = llm.extract_json(text)
     offers = parse_offers(data, SOURCE_ID)
     accepted = [n for n in data.get("accepted_networks") or [] if isinstance(n, dict)]
+    # cards the user doesn't hold but the store accepts -> "you could buy it" offers
+    from app.agents.buyable import buy_offer
+    from app.agents.normalizer import key
+
+    by_key = {key(n["name"]): n for n in buyable}
+    for a in accepted:
+        net = by_key.get(key(str(a.get("name", ""))))
+        if net and str(a.get("accepted", "")).lower() == "yes":
+            offers.append(buy_offer(net, SOURCE_ID, evidence=a.get("evidence_url")))
     return SourceResult(
         source=SOURCE_ID,
         label=LABEL,
