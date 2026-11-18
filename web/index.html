@@ -187,8 +187,9 @@
                   <div class="mt-0.5 font-semibold" dir="auto" x-text="v.card_network || v.issuer"></div>
                 </div>
                 <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                      :class="v.match === 'direct' ? 'bg-white/20' : 'bg-amber-300/90 text-amber-950'"
-                      x-text="v.match === 'direct' ? 'Valid here' : 'Verify'"></span>
+                      :class="v.match === 'direct' ? 'bg-white/20' : v.accepted === 'yes' ? 'bg-emerald-300/90 text-emerald-950' : 'bg-amber-300/90 text-amber-950'"
+                      :title="v.accepted === 'yes' ? 'The store\'s website says it accepts this card' : ''"
+                      x-text="v.match === 'direct' ? 'Valid here' : v.accepted === 'yes' ? 'Accepted ✓' : 'Verify'"></span>
               </div>
               <div class="mt-5 text-[28px] font-semibold tabular leading-none">₪<span x-text="fmt(v.remaining_balance)"></span></div>
               <div class="mt-1 text-[11px] text-white/70">

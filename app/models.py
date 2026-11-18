@@ -39,6 +39,8 @@ class Voucher(BaseModel):
     used_by: str | None = None
     # filled by the matcher
     match: Literal["direct", "network"] | None = None
+    # for network vouchers: what the store's website said ("yes" | "no" | "unknown")
+    accepted: str | None = None
     days_to_expiry: int | None = None
 
     def for_llm(self) -> dict[str, Any]:

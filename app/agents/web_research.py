@@ -26,6 +26,7 @@ async def run(store: NormalizedStore, held_networks: list[str]) -> SourceResult:
         f"Store: {names}{hint}, in Israel.\n"
         f"1. Which gift cards / voucher networks does this store accept? Explicitly check each of "
         f"these, which the user owns: {held}.\n"
+        f"   In accepted_networks, use exactly these names (one entry each).\n"
         f"2. Any current promotions or coupon codes on the store's own site?\n\n"
         f"{output_format(EXTRA)}"
     )

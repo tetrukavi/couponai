@@ -9,25 +9,11 @@ from app.models import NormalizedStore, Offer, RankedOption, Recommendation, Sou
 CONF_RANK = {"high": 0, "medium": 1, "low": 2}
 
 
-def _accepted(results: list[SourceResult]) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for r in results:
-        for n in r.extra.get("accepted_networks", []):
-            if n.get("name"):
-                out[str(n["name"]).lower()] = str(n.get("accepted", "unknown")).lower()
-    return out
-
-
 def rules_recommendation(
     store: NormalizedStore, results: list[SourceResult], preliminary: bool
 ) -> Recommendation:
     local = next((r for r in results if r.source == "local"), None)
-    accepted = _accepted(results)
-    vouchers = []
-    for v in local.vouchers if local else []:
-        if v.match == "network" and accepted.get((v.card_network or "").lower()) == "no":
-            continue  # store site says this network isn't accepted
-        vouchers.append(v)
+    vouchers = list(local.vouchers) if local else []  # already filtered by the store's answer
 
     online: list[Offer] = [o for r in results if r.source != "local" for o in r.offers]
     online.sort(
@@ -41,7 +27,13 @@ def rules_recommendation(
     for v in vouchers:
         label = v.card_network or v.issuer
         exp = f", expires in {v.days_to_expiry} days" if v.days_to_expiry is not None else ""
-        verify = " (check the store accepts it)" if v.match == "network" else ""
+        verify = ""
+        if v.match == "network":
+            verify = (
+                " (store confirms it accepts this card)"
+                if v.accepted == "yes"
+                else " (check the store accepts it)"
+            )
         ranked.append(
             RankedOption(
                 title=f"Your {label} voucher (₪{v.remaining_balance or 0:,.0f} left)",

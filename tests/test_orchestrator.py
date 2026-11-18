@@ -177,3 +177,22 @@ def test_cost_of_usage():
 
     # haiku: $0.10 in + 0.1M*$0.50 out + 3 searches * $0.01
     assert costs.cost_of(U(), "claude-haiku-5-5") == pytest.approx(0.10 + 0.05 + 0.03)
+
+
+async def test_store_answer_rematches_my_coupons_and_is_reused_free(llm_on):
+    async def store_site(store):
+        return SourceResult(
+            source="store_site", label="Store website", cost_usd=0.04,
+            extra={"accepted_networks": [{"name": "תו הזהב", "accepted": "yes"}]},
+        )  # fmt: skip
+
+    workers = [(spec("store_site"), Counter(store_site))]
+    events = await collect("Zara", workers, mode="run")
+    locals_ = of(events, "local")
+    assert "V008" not in [v["voucher_id"] for v in locals_[0]["vouchers"]]
+    assert [v["voucher_id"] for v in locals_[-1]["vouchers"]] == ["V008"]  # re-emitted
+    assert locals_[-1]["vouchers"][0]["accepted"] == "yes"
+
+    events = await collect("Zara", workers)  # next time: saved answer, free
+    assert of(events, "online")[-1]["status"] == "saved"
+    assert [v["voucher_id"] for v in of(events, "local")[-1]["vouchers"]] == ["V008"]

@@ -14,3 +14,26 @@ networks:
   - name: תו הזהב
     aliases: [Tav Hazahav, תו זהב]
     stores: [Castro, Fox, Golf, Super-Pharm, ACE, Home Center, Max Stock]
+  # Networks without a seed store list: they show up for a store only after the store's
+  # website confirms it accepts them (or for stores you add to `stores` here).
+  - name: BuyMe Foody
+    aliases: [ביימי פודי, Foody, BuyMe Foodie]
+    stores: []
+  - name: chefZone
+    aliases: [Chef Zone, שף זון, צ'ף זון]
+    stores: []
+  - name: giftZone
+    aliases: [Gift Zone, גיפט זון]
+    stores: []
+  - name: SpaZone
+    aliases: [Spa Zone, ספא זון]
+    stores: []
+  - name: Dream Card
+    aliases: [דרים קארד, DreamCard, DREAM CARD]
+    stores: []
+  - name: נופשונית
+    aliases: [Nofshonit, נופשונית VIP]
+    stores: []
+  - name: Shopping Card
+    aliases: [שופינג קארד, כרטיס שופינג]
+    stores: []

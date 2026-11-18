@@ -140,17 +140,49 @@ def is_usable(v: Voucher, today: date) -> bool:
     return True
 
 
-def match_voucher(v: Voucher, store: NormalizedStore) -> str | None:
+def network_keys(name: str | None) -> set[str]:
+    """All comparison keys for a card network: its own name + aliases from card_networks.yaml."""
+    if not name:
+        return set()
+    net = _network_entry(name)
+    names = [name, *([net["name"], *net.get("aliases", [])] if net else [])]
+    return {key(x) for x in names} - {""}
+
+
+def acceptance_map(accepted_networks: list[dict] | None) -> dict[str, str]:
+    """Store-site answer [{name, accepted: yes|no|unknown}] -> {network key: status}."""
+    out: dict[str, str] = {}
+    for n in accepted_networks or []:
+        status = str(n.get("accepted", "unknown")).strip().lower()
+        if n.get("name") and status in ("yes", "no", "unknown"):
+            for k in network_keys(str(n["name"])):
+                out[k] = status
+    return out
+
+
+def match_voucher(
+    v: Voucher, store: NormalizedStore, accepted: dict[str, str] | None = None
+) -> tuple[str | None, str | None]:
+    """Returns (match, acceptance). match: "direct" | "network" | None.
+
+    A network voucher matches when the store's website confirmed the network ("yes"), or when
+    the seed list says the store takes it and the website didn't say "no".
+    """
     store_keys = {key(x) for x in [store.canonical, *store.aliases]} - {""}
-    names = [*v.valid_stores, v.issuer]
-    for n in names:
+    for n in [*v.valid_stores, v.issuer]:
         nk = key(n)
         if nk in store_keys or any(fuzz.ratio(nk, sk) >= 92 for sk in store_keys):
-            return "direct"
+            return "direct", None
+    if not v.card_network:
+        return None, None
+    status = next(
+        (accepted[k] for k in network_keys(v.card_network) if k in (accepted or {})), None
+    )
     net = _network_entry(v.card_network)
-    if net and key(store.canonical) in {key(s) for s in net.get("stores", [])}:
-        return "network"
-    return None
+    seeded = bool(net) and key(store.canonical) in {key(s) for s in net.get("stores", [])}
+    if status == "yes" or (seeded and status != "no"):
+        return "network", status
+    return None, status
 
 
 def held_networks(today: date | None = None) -> list[str]:
@@ -176,19 +208,26 @@ def _offer(v: Voucher) -> Offer:
         effective_cost_per_100=0.0,  # already paid: no new money out of pocket
         where="Use at the register (you already own it)",
         terms=f"Expires {v.expiry_date.isoformat()}" if v.expiry_date else None,
-        confidence="high" if v.match == "direct" else "medium",
+        confidence="high" if v.match == "direct" or v.accepted == "yes" else "medium",
         voucher_id=v.voucher_id,
     )
 
 
-def search(store: NormalizedStore, today: date | None = None) -> SourceResult:
+def search(
+    store: NormalizedStore,
+    today: date | None = None,
+    accepted_networks: list[dict] | None = None,
+) -> SourceResult:
+    """accepted_networks: the store-site agent's answer, used to confirm or rule out networks."""
     t0 = time.perf_counter()
     today = today or date.today()
+    accepted = acceptance_map(accepted_networks)
     found: list[Voucher] = []
-    skipped = 0
+    skipped = rejected = 0
     for v in load_vouchers():
-        m = match_voucher(v, store)
+        m, status = match_voucher(v, store, accepted)
         if not m:
+            rejected += status == "no" and is_usable(v, today)
             continue
         if not is_usable(v, today):
             skipped += 1
@@ -197,26 +236,33 @@ def search(store: NormalizedStore, today: date | None = None) -> SourceResult:
             v.model_copy(
                 update={
                     "match": m,
+                    "accepted": status,
                     "days_to_expiry": (v.expiry_date - today).days if v.expiry_date else None,
                 }
             )
         )
-    # direct first, then soonest expiry, then biggest balance
+    # direct first, then confirmed networks, then soonest expiry, then biggest balance
     found.sort(
-        key=lambda v: (v.match != "direct", v.days_to_expiry or 99999, -(v.remaining_balance or 0))
+        key=lambda v: (
+            v.match != "direct",
+            v.accepted != "yes",
+            v.days_to_expiry or 99999,
+            -(v.remaining_balance or 0),
+        )
     )
-    note = None
+    notes = []
     if skipped:
-        note = f"{skipped} matching voucher(s) hidden: expired or used up"
-    if any(v.match == "network" for v in found):
-        net_note = "Card-network matches need confirming that the store accepts them"
-        note = f"{note}. {net_note}" if note else net_note
+        notes.append(f"{skipped} matching voucher(s) hidden: expired or used up")
+    if rejected:
+        notes.append(f"{rejected} voucher(s) hidden: the store's website says it doesn't take them")
+    if any(v.match == "network" and v.accepted != "yes" for v in found):
+        notes.append("Gift cards marked 'Verify' aren't confirmed by the store yet")
     return SourceResult(
         source=SOURCE_ID,
         label=LABEL,
         status="ok" if found else "empty",
         offers=[_offer(v) for v in found],
         vouchers=found,
-        note=note,
+        note=". ".join(notes) or None,
         elapsed_ms=int((time.perf_counter() - t0) * 1000),
     )

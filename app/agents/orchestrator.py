@@ -99,6 +99,24 @@ async def _run_worker(spec: SourceSpec, fn: Worker, store: NormalizedStore) -> S
     return res
 
 
+async def _recheck_local(
+    store: NormalizedStore, results: list[SourceResult]
+) -> SourceResult | None:
+    """Re-match my coupons using what the store's website said about gift-card networks.
+
+    Returns the updated local result, or None if nothing changed.
+    """
+    answers = [n for r in results[1:] for n in r.extra.get("accepted_networks", [])]
+    if not answers:
+        return None
+    new = await asyncio.to_thread(local_voucher.search, store, None, answers)
+    sig = lambda r: ([(v.voucher_id, v.accepted) for v in r.vouchers], r.note)  # noqa: E731
+    if sig(new) == sig(results[0]):
+        return None
+    new.elapsed_ms = results[0].elapsed_ms
+    return new
+
+
 def _fingerprint(results: list[SourceResult]) -> str:
     """Changes whenever my coupons or the online results change."""
     local = results[0]
@@ -134,6 +152,9 @@ async def search(
             yield "source", saved.model_dump(mode="json")
         else:
             to_run.append((spec, fn))
+    if updated := await _recheck_local(store, results):  # saved store answer: free
+        results[0] = updated
+        yield "local", updated.model_dump(mode="json")
 
     needs_pay = [spec for spec, _ in to_run if spec.needs_llm]
     if not paid:
@@ -174,6 +195,9 @@ async def search(
             spent += res.cost_usd
             results.append(res)
             yield "source", res.model_dump(mode="json")
+        if updated := await _recheck_local(store, results):
+            results[0] = updated
+            yield "local", updated.model_dump(mode="json")
 
         rec = synthesizer.rules_recommendation(store, results, False)
         rec_key = f"rec:{costs.month_key()}:{key(store.canonical)}:{_fingerprint(results)}"

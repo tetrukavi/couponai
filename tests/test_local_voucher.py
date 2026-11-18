@@ -52,3 +52,48 @@ def test_csv_files_supported(tmp_path, monkeypatch):
     get_settings.cache_clear()
     res = local_voucher.search(asyncio.run(normalize("זארה")), today=date(2026, 1, 1))
     assert ids(res) == {"C1": "direct"}
+
+
+# ---- store-site confirmation of gift-card networks ----
+
+
+def test_confirmed_network_appears_even_without_seed():
+    store = asyncio.run(normalize("Zara"))  # no seed list covers Zara for תו הזהב
+    assert "V008" not in ids(local_voucher.search(store))
+    res = local_voucher.search(
+        store, accepted_networks=[{"name": "Tav Hazahav", "accepted": "yes"}]
+    )
+    [v] = [v for v in res.vouchers if v.voucher_id == "V008"]
+    assert v.match == "network" and v.accepted == "yes"  # alias "Tav Hazahav" -> תו הזהב
+
+
+def test_store_saying_no_hides_seeded_network():
+    store = asyncio.run(normalize("Foot Locker"))
+    assert "V007" in ids(local_voucher.search(store))  # Max Gift Card, seeded
+    res = local_voucher.search(
+        store, accepted_networks=[{"name": "max gift card", "accepted": "no"}]
+    )
+    assert "V007" not in ids(res)
+    assert "doesn't take them" in res.note
+
+
+def test_unknown_keeps_seeded_network_unconfirmed():
+    store = asyncio.run(normalize("Foot Locker"))
+    res = local_voucher.search(
+        store, accepted_networks=[{"name": "BuyMe ALL", "accepted": "unknown"}]
+    )
+    [v] = [v for v in res.vouchers if v.voucher_id == "V006"]
+    assert v.accepted == "unknown" and "Verify" in res.note
+
+
+def test_confirmed_networks_sort_before_unconfirmed():
+    store = asyncio.run(normalize("Foot Locker"))
+    res = local_voucher.search(
+        store, accepted_networks=[{"name": "BuyMe Fashion", "accepted": "yes"}]
+    )
+    order = [v.voucher_id for v in res.vouchers if v.match == "network"]
+    assert order[0] == "V009"
+
+
+def test_hebrew_english_network_aliases():
+    assert local_voucher.network_keys("Dream Card") == local_voucher.network_keys("דרים קארד")
