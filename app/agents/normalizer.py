@@ -64,10 +64,37 @@ def _load(path: Path, mtime: float) -> StoreIndex:
     return StoreIndex(data.get("stores", []))
 
 
+def plausible_alias(name: str, known_names: list[str]) -> bool:
+    """Could `name` really be another spelling of a store known by `known_names`?
+
+    Guards against the model mapping an unknown name to a different, existing brand
+    (e.g. "Selas" -> "Castro"). Cross-script names (Hebrew vs English) must match one of the
+    store's names in the same script, which the alias lists provide.
+    """
+    k = key(name)
+    if not k:
+        return False
+    for n in known_names:
+        nk = key(n)
+        if nk and (fuzz.ratio(k, nk) >= 70 or (min(len(k), len(nk)) >= 4 and (k in nk or nk in k))):
+            return True
+    return False
+
+
+def _names(entry: dict) -> list[str]:
+    return [entry["canonical"], *entry.get("aliases", []), entry.get("domain") or ""]
+
+
 def store_index() -> StoreIndex:
     p = get_settings().data_dir / "store_aliases.yaml"
-    learned = list(get_cache().items_with_prefix("alias:").values())
     base = _load(p, p.stat().st_mtime)
+    learned = []
+    for e in get_cache().items_with_prefix("alias:").values():
+        known = base.by_key.get(key(e.get("canonical", "")))
+        if known:  # learned aliases for a store we already know must look like its names
+            ok = [a for a in e.get("aliases", []) if plausible_alias(a, _names(known))]
+            e = {**e, "aliases": ok}
+        learned.append(e)
     if not learned:
         return base
     return StoreIndex(base.entries + learned)
@@ -93,9 +120,13 @@ async def _llm_normalize(query: str) -> NormalizedStore | None:
     s = get_settings()
     data = await asyncio.wait_for(
         llm.structured(
-            "Normalize an Israeli retail store / brand name the user typed (Hebrew or English).",
+            "Normalize an Israeli retail store / brand name the user typed (Hebrew or English). "
+            "Return the SAME store the user meant, only spelled canonically. Never substitute "
+            "a different brand, even a similar-sounding one or one from the same company group. "
+            "If you don't know this exact store, return the name as typed as canonical.",
             f"User typed: {query!r}\nReturn the canonical English name, Hebrew and English "
-            "spellings as aliases, the Israeli website domain if you know it, and a category.",
+            "spellings of THIS store as aliases, its Israeli website domain if you know it, and "
+            "a category.",
             _LLM_SCHEMA,
             model=s.worker_model,
             effort="low",
@@ -104,6 +135,11 @@ async def _llm_normalize(query: str) -> NormalizedStore | None:
         timeout=s.normalize_llm_timeout_s,
     )
     if not data.get("is_store") or not data.get("canonical"):
+        return None
+    known = store_index().by_key.get(key(data["canonical"]))
+    if known and not plausible_alias(query, _names(known)):
+        # the model mapped this name onto a different store we already know: don't trust it
+        log.warning("rejecting LLM normalization %r -> %r", query, data["canonical"])
         return None
     entry = {
         "canonical": data["canonical"].strip(),
