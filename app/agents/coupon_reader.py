@@ -28,12 +28,13 @@ _SCHEMA = {
         "expiry_date": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
         "purchased_from": {"type": ["string", "null"]},
         "notes": {"type": ["string", "null"]},
+        "link": {"type": ["string", "null"], "description": "redemption web address, if shown"},
         "unsure_fields": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
         "is_coupon", "issuer", "card_network", "valid_stores", "code", "face_value",
         "paid_amount", "remaining_balance", "currency", "purchase_date", "expiry_date",
-        "purchased_from", "notes", "unsure_fields",
+        "purchased_from", "notes", "link", "unsure_fields",
     ],
     "additionalProperties": False,
 }  # fmt: skip
@@ -47,6 +48,7 @@ BuyMe emails, club purchase confirmations, plastic gift cards) and extract its d
   null for a single-store voucher. valid_stores: the store(s) for a single-store voucher.
 - face_value = value printed on the voucher; paid_amount only if a price paid is shown.
 - Dates: ISO format. Israeli dates are day/month/year.
+- link: a web address for using/redeeming it, only if clearly shown (copy it exactly).
 - Never guess: use null for anything not visible and list doubtful fields in unsure_fields.
 - If the image is not a voucher, set is_coupon=false."""
 

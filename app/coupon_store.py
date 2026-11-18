@@ -9,6 +9,7 @@ import threading
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -20,8 +21,31 @@ _lock = threading.Lock()
 _COLUMNS = (
     "issuer", "card_network", "valid_stores", "code", "face_value", "paid_amount",
     "remaining_balance", "currency", "purchase_date", "expiry_date", "status",
-    "purchased_from", "notes",
+    "purchased_from", "notes", "link",
 )  # fmt: skip
+
+NOTES_MAX, LINK_MAX = 2000, 500
+
+
+def clean_link(v: str | None) -> str | None:
+    """Only real web links (http/https): never javascript:, data: or other schemes."""
+    if v is None:
+        return None
+    v = v.strip()
+    if not v:
+        return None
+    if "://" not in v and "." in v.split("/")[0]:  # "buyme.co.il" -> "https://buyme.co.il"
+        v = "https://" + v
+    u = urlparse(v)
+    if u.scheme not in ("http", "https") or not u.netloc or any(c.isspace() for c in v):
+        raise ValueError("link must be a web address starting with https://")
+    return v
+
+
+def _blank(v):
+    if isinstance(v, str):
+        v = v.strip()
+    return v or None
 
 
 class CouponIn(BaseModel):
@@ -39,14 +63,18 @@ class CouponIn(BaseModel):
     expiry_date: date | None = None
     status: str = "unused"
     purchased_from: str | None = Field(default=None, max_length=80)
-    notes: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=NOTES_MAX)
+    link: str | None = Field(default=None, max_length=LINK_MAX)
 
     @field_validator("issuer", "card_network", "code", "purchased_from", "notes", mode="before")
     @classmethod
     def _blank_to_none(cls, v):
-        if isinstance(v, str):
-            v = v.strip()
-        return v or None
+        return _blank(v)
+
+    @field_validator("link", mode="before")
+    @classmethod
+    def _link(cls, v):
+        return clean_link(v)
 
     @field_validator("valid_stores", mode="before")
     @classmethod
@@ -76,10 +104,24 @@ class CouponIn(BaseModel):
 
 
 class CouponPatch(BaseModel):
+    """Partial update. For notes/link/code an empty string clears the field."""
+
     remaining_balance: float | None = Field(default=None, ge=0)
     status: str | None = None
     expiry_date: date | None = None
-    notes: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=NOTES_MAX)
+    link: str | None = Field(default=None, max_length=LINK_MAX)
+    code: str | None = Field(default=None, max_length=200)
+
+    @field_validator("notes", "code", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        return _blank(v)
+
+    @field_validator("link", mode="before")
+    @classmethod
+    def _link(cls, v):
+        return clean_link(v)
 
 
 @contextmanager
@@ -100,7 +142,7 @@ def _db(path: Path | None = None):
                     created_at TEXT, updated_at TEXT)"""
             )
             have = {r[1] for r in conn.execute("PRAGMA table_info(coupons)")}
-            for col in ("added_by", "used_by", "used_at"):  # upgrade older databases
+            for col in ("added_by", "used_by", "used_at", "link"):  # upgrade older databases
                 if col not in have:
                     conn.execute(f"ALTER TABLE coupons ADD COLUMN {col} TEXT")
             yield conn
@@ -126,6 +168,7 @@ def _to_voucher(row: sqlite3.Row) -> Voucher:
         status=d["status"] or "unused",
         purchased_from=d["purchased_from"],
         notes=d["notes"],
+        link=d.get("link"),
         source_file="app",
         added_by=d.get("added_by"),
         used_by=d.get("used_by"),

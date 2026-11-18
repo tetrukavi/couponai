@@ -36,7 +36,9 @@ def rules_recommendation(
             )
         ranked.append(
             RankedOption(
-                title=f"Your {label} voucher (₪{v.remaining_balance or 0:,.0f} left)",
+                title=f"Your {label} voucher ("
+                + ("ticket" if v.remaining_balance is None else f"₪{v.remaining_balance:,.0f} left")
+                + ")",
                 source="local",
                 effective_cost_per_100=0,
                 note=f"Already paid{exp}{verify}",

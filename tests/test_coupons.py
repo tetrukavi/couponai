@@ -118,3 +118,52 @@ def test_extract_with_mocked_llm(monkeypatch):
 def test_extract_rejects_bad_images(media_type, data):
     with pytest.raises(ValueError):
         coupon_reader.decode_image(data, media_type)
+
+
+# ---- notes & link ----
+
+
+@pytest.mark.parametrize(
+    "bad", ["javascript:alert(1)", "data:text/html,hi", "ftp://x.com", "not a link"]
+)
+def test_link_rejects_unsafe_or_invalid(bad):
+    r = client.post("/api/coupons", json={"valid_stores": ["Nike"], "link": bad})
+    assert r.status_code == 422
+
+
+def test_link_normalized_and_editable():
+    c = add(card_network="BuyMe ALL", face_value=100, link="buyme.co.il")
+    assert c["link"] == "https://buyme.co.il"
+    vid = c["voucher_id"]
+    r = client.patch(
+        f"/api/coupons/{vid}",
+        json={"notes": "pair ticket\nbook ahead", "link": "https://x.co.il/a?b=1"},
+    )
+    assert (
+        r.json()["notes"] == "pair ticket\nbook ahead"
+        and r.json()["link"] == "https://x.co.il/a?b=1"
+    )
+    assert r.json()["status"] == "unused"  # editing notes doesn't touch the balance/status
+    r = client.patch(f"/api/coupons/{vid}", json={"notes": "", "link": ""})  # clear both
+    assert r.json()["notes"] is None and r.json()["link"] is None
+    assert client.patch(f"/api/coupons/{vid}", json={"link": "javascript:x"}).status_code == 422
+
+
+def test_move_code_to_link():
+    c = add(card_network="נופשונית", code="https://slink.example/abc", face_value=630)
+    r = client.patch(
+        f"/api/coupons/{c['voucher_id']}", json={"link": "https://slink.example/abc", "code": ""}
+    ).json()
+    assert r["code"] is None and r["link"] == "https://slink.example/abc"
+
+
+def test_link_and_notes_never_sent_to_llm():
+    from app.models import Voucher
+
+    v = Voucher(voucher_id="x", issuer="i", link="https://secret.example/t", notes="private")
+    assert "link" not in v.for_llm() and "notes" not in v.for_llm()
+
+
+def test_export_includes_link():
+    add(valid_stores=["Golf"], face_value=50, link="https://golf.example")
+    assert "https://golf.example" in client.get("/api/coupons/export.csv").text

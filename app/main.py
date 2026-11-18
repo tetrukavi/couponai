@@ -244,7 +244,7 @@ async def export_coupons() -> Response:
     buf = io.StringIO()
     cols = ["voucher_id", "issuer", "card_network", "valid_stores", "code", "face_value",
             "paid_amount", "remaining_balance", "currency", "purchase_date", "expiry_date",
-            "status", "purchased_from", "notes", "source_file"]  # fmt: skip
+            "status", "purchased_from", "notes", "link", "source_file"]  # fmt: skip
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
     for v in local_voucher.load_vouchers():

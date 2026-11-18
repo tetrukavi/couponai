@@ -54,6 +54,15 @@ def _to_float(v: Any) -> float | None:
         return None
 
 
+def _safe_link(v: Any) -> str | None:
+    from app.coupon_store import clean_link
+
+    try:
+        return clean_link(str(v)) if v else None
+    except ValueError:
+        return None
+
+
 def _row_to_voucher(row: dict[str, Any], source_file: str) -> Voucher | None:
     r = {str(k).strip().lower(): _clean(v) for k, v in row.items()}
     if not r.get("issuer") and not r.get("valid_stores") and not r.get("card_network"):
@@ -74,6 +83,7 @@ def _row_to_voucher(row: dict[str, Any], source_file: str) -> Voucher | None:
         status=str(r.get("status") or "unused").lower(),
         purchased_from=r.get("purchased_from"),
         notes=r.get("notes"),
+        link=_safe_link(r.get("link")),
         source_file=source_file,
     )
 

@@ -67,6 +67,8 @@ window.couponApp = function () {
     networkNames: [],
     toast: null,
     online: null,
+    editing: {},
+    editError: {},
     refreshArmed: false,
 
     async init() {
@@ -247,7 +249,7 @@ window.couponApp = function () {
     // ---------- Add coupon ----------
     emptyForm() {
       return { kind: 'store', store: '', card_network: '', code: '', face_value: '', paid_amount: '',
-               remaining_balance: '', expiry_date: '', purchased_from: '', notes: '' };
+               remaining_balance: '', expiry_date: '', purchased_from: '', notes: '', link: '' };
     },
     openSheet() {
       this.form = this.emptyForm();
@@ -277,7 +279,7 @@ window.couponApp = function () {
         card_network: f.kind === 'network' ? f.card_network : null,
         code: f.code, face_value: num(f.face_value), paid_amount: num(f.paid_amount),
         remaining_balance: num(f.remaining_balance), expiry_date: f.expiry_date || null,
-        purchased_from: f.purchased_from, notes: f.notes,
+        purchased_from: f.purchased_from, notes: f.notes, link: f.link,
       };
       this.saving = true;
       this.formError = null;
@@ -312,6 +314,7 @@ window.couponApp = function () {
           code: s(d.code), face_value: s(d.face_value), paid_amount: s(d.paid_amount),
           remaining_balance: s(d.remaining_balance), expiry_date: s(d.expiry_date),
           purchased_from: s(d.purchased_from) || this.form.purchased_from, notes: s(d.notes),
+          link: s(d.link),
         };
         // always ask to double-check the code: one wrong digit makes it useless
         this.unsure = [...new Set([...(d.unsure_fields || []), 'code'])]
@@ -322,6 +325,27 @@ window.couponApp = function () {
         this.reading = false;
       }
     },
+
+    startEdit(c) {
+      this.editing = { ...this.editing, [c.voucher_id]: { notes: c.notes || '', link: c.link || '' } };
+      this.editError = { ...this.editError, [c.voucher_id]: null };
+    },
+    stopEdit(c) {
+      const { [c.voucher_id]: _, ...rest } = this.editing;
+      this.editing = rest;
+    },
+    async saveDetails(c) {
+      const e = this.editing[c.voucher_id];
+      try {
+        await this.api('PATCH', `/api/coupons/${c.voucher_id}`, { notes: e.notes, link: e.link });
+        this.stopEdit(c);
+        this.flash('Saved');
+        this.loadCoupons();
+      } catch (err) {
+        this.editError = { ...this.editError, [c.voucher_id]: err.message };
+      }
+    },
+    money(n) { return n == null ? 'Ticket' : '₪' + this.fmt(n); },
 
     flash(msg) {
       this.toast = msg;

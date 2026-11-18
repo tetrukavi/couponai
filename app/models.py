@@ -34,6 +34,7 @@ class Voucher(BaseModel):
     status: str = "unused"
     purchased_from: str | None = None
     notes: str | None = None
+    link: str | None = None  # web page to use/redeem it
     source_file: str | None = None
     added_by: str | None = None
     used_by: str | None = None
@@ -47,7 +48,7 @@ class Voucher(BaseModel):
         """Safe view for prompts: no code, no file path."""
         return self.model_dump(
             mode="json",
-            exclude={"code", "source_file", "notes", "voucher_id", "added_by", "used_by"},
+            exclude={"code", "link", "source_file", "notes", "voucher_id", "added_by", "used_by"},
         )
 
 
