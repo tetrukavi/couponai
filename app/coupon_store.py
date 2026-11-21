@@ -4,6 +4,7 @@ Your Excel/CSV files in data/vouchers/ stay read-only; this is the only place th
 coupon data.
 """
 
+import secrets
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -25,6 +26,11 @@ _COLUMNS = (
 )  # fmt: skip
 
 NOTES_MAX, LINK_MAX = 2000, 500
+
+# One photo per coupon, stored as a file next to the database (on the server: the /data volume).
+# Never sent to the LLM or the web; only served back to logged-in users.
+IMAGE_MAX_BYTES = 6_000_000
+IMAGE_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 
 def clean_link(v: str | None) -> str | None:
@@ -142,7 +148,13 @@ def _db(path: Path | None = None):
                     created_at TEXT, updated_at TEXT)"""
             )
             have = {r[1] for r in conn.execute("PRAGMA table_info(coupons)")}
-            for col in ("added_by", "used_by", "used_at", "link"):  # upgrade older databases
+            for col in (
+                "added_by",
+                "used_by",
+                "used_at",
+                "link",
+                "image",
+            ):  # upgrade older databases
                 if col not in have:
                     conn.execute(f"ALTER TABLE coupons ADD COLUMN {col} TEXT")
             yield conn
@@ -172,6 +184,7 @@ def _to_voucher(row: sqlite3.Row) -> Voucher:
         source_file="app",
         added_by=d.get("added_by"),
         used_by=d.get("used_by"),
+        image=d.get("image"),
     )
 
 
@@ -228,5 +241,85 @@ def update_coupon(voucher_id: str, patch: CouponPatch, user: str | None = None) 
 def delete_coupon(voucher_id: str) -> None:
     rid = _row_id(voucher_id)
     with _db() as conn:
-        if conn.execute("DELETE FROM coupons WHERE id=?", (rid,)).rowcount == 0:
+        row = conn.execute("SELECT image FROM coupons WHERE id=?", (rid,)).fetchone()
+        if row is None:
             raise KeyError(voucher_id)
+        conn.execute("DELETE FROM coupons WHERE id=?", (rid,))
+    _remove_file(row["image"])
+
+
+# ---------- photo ----------
+
+
+def images_dir() -> Path:
+    return get_settings().coupon_db_path.parent / "coupon_images"
+
+
+def _sniff(data: bytes) -> str | None:
+    """The real file type from its first bytes (never trust the name or the browser)."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _remove_file(name: str | None) -> None:
+    if name:
+        (images_dir() / Path(name).name).unlink(missing_ok=True)
+
+
+def set_image(voucher_id: str, data: bytes) -> Voucher:
+    """Attach (or replace) the coupon's photo. Raises KeyError / ValueError."""
+    rid = _row_id(voucher_id)
+    if not data or len(data) > IMAGE_MAX_BYTES:
+        raise ValueError("the photo must be smaller than 6 MB")
+    ext = _sniff(data)
+    if ext is None:
+        raise ValueError("the photo must be a JPEG, PNG or WebP image")
+    d = images_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    # a new name each time, so phones never show a stale cached copy
+    name = f"{rid}-{secrets.token_hex(6)}.{ext}"
+    tmp = d / (name + ".part")
+    tmp.write_bytes(data)
+    try:
+        with _db() as conn:
+            row = conn.execute("SELECT image FROM coupons WHERE id=?", (rid,)).fetchone()
+            if row is None:
+                raise KeyError(voucher_id)
+            tmp.replace(d / name)
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute("UPDATE coupons SET image=?, updated_at=? WHERE id=?", (name, now, rid))
+            new = conn.execute("SELECT * FROM coupons WHERE id=?", (rid,)).fetchone()
+    finally:
+        tmp.unlink(missing_ok=True)
+    _remove_file(row["image"])
+    return _to_voucher(new)
+
+
+def image_file(voucher_id: str) -> tuple[Path, str]:
+    """(path, media type) of the coupon's photo. KeyError if there is none."""
+    rid = _row_id(voucher_id)
+    with _db() as conn:
+        row = conn.execute("SELECT image FROM coupons WHERE id=?", (rid,)).fetchone()
+    if row is None or not row["image"]:
+        raise KeyError(voucher_id)
+    path = images_dir() / Path(row["image"]).name
+    if not path.is_file():
+        raise KeyError(voucher_id)
+    return path, IMAGE_TYPES[path.suffix.lstrip(".")]
+
+
+def remove_image(voucher_id: str) -> Voucher:
+    rid = _row_id(voucher_id)
+    with _db() as conn:
+        row = conn.execute("SELECT image FROM coupons WHERE id=?", (rid,)).fetchone()
+        if row is None:
+            raise KeyError(voucher_id)
+        conn.execute("UPDATE coupons SET image=NULL WHERE id=?", (rid,))
+        new = conn.execute("SELECT * FROM coupons WHERE id=?", (rid,)).fetchone()
+    _remove_file(row["image"])
+    return _to_voucher(new)

@@ -38,6 +38,7 @@ class Voucher(BaseModel):
     source_file: str | None = None
     added_by: str | None = None
     used_by: str | None = None
+    image: str | None = None  # file name of the coupon's photo (app coupons only); never sent out
     # filled by the matcher
     match: Literal["direct", "network"] | None = None
     # for network vouchers: "yes" | "no" | "unknown" | "not_listed"
@@ -52,7 +53,16 @@ class Voucher(BaseModel):
         """Safe view for prompts: no code, no file path."""
         return self.model_dump(
             mode="json",
-            exclude={"code", "link", "source_file", "notes", "voucher_id", "added_by", "used_by"},
+            exclude={
+                "code",
+                "link",
+                "source_file",
+                "notes",
+                "voucher_id",
+                "added_by",
+                "used_by",
+                "image",
+            },  # fmt: skip
         )
 
 

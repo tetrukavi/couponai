@@ -167,3 +167,66 @@ def test_link_and_notes_never_sent_to_llm():
 def test_export_includes_link():
     add(valid_stores=["Golf"], face_value=50, link="https://golf.example")
     assert "https://golf.example" in client.get("/api/coupons/export.csv").text
+
+
+# ---------- photo ----------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+
+
+def put_image(cid, raw):
+    import base64
+
+    return client.put(
+        f"/api/coupons/{cid}/image",
+        json={"media_type": "image/png", "data": base64.b64encode(raw).decode()},
+    )
+
+
+def test_photo_add_get_replace_remove():
+    c = add(valid_stores=["Zara"], code="Z-9")
+    assert c["image"] is None
+    r = put_image(c["voucher_id"], PNG)
+    assert r.status_code == 200, r.text
+    first = r.json()["image"]
+    assert first.endswith(".png")
+    g = client.get(f"/api/coupons/{c['voucher_id']}/image")
+    assert g.status_code == 200 and g.content == PNG
+    assert g.headers["content-type"] == "image/png"
+    assert g.headers["x-content-type-options"] == "nosniff"
+    # replacing removes the old file
+    second = put_image(c["voucher_id"], JPG).json()["image"]
+    assert second.endswith(".jpg") and second != first
+    assert not (coupon_store.images_dir() / first).exists()
+    assert client.get(f"/api/coupons/{c['voucher_id']}/image").content == JPG
+    # listed with the coupon, but never in what the AI sees
+    listed = next(
+        x for x in client.get("/api/coupons").json() if x["voucher_id"] == c["voucher_id"]
+    )
+    assert listed["image"] == second
+    v = next(v for v in coupon_store.list_coupons() if v.voucher_id == c["voucher_id"])
+    assert "image" not in v.for_llm()
+    # remove
+    assert client.delete(f"/api/coupons/{c['voucher_id']}/image").json()["image"] is None
+    assert client.get(f"/api/coupons/{c['voucher_id']}/image").status_code == 404
+    assert not (coupon_store.images_dir() / second).exists()
+
+
+def test_photo_rejects_non_images_and_unknown_coupons():
+    c = add(valid_stores=["Zara"])
+    assert put_image(c["voucher_id"], b"<svg onload=alert(1)>").status_code == 422
+    assert put_image(c["voucher_id"], b"").status_code == 422
+    r = client.put(f"/api/coupons/{c['voucher_id']}/image", json={"media_type": "x", "data": "!!"})
+    assert r.status_code == 422
+    assert put_image("C999999", PNG).status_code == 404
+    assert put_image("X1", PNG).status_code == 404  # Excel vouchers have no photos
+    assert client.get("/api/coupons/C999999/image").status_code == 404
+
+
+def test_deleting_coupon_deletes_photo():
+    c = add(valid_stores=["Zara"])
+    name = put_image(c["voucher_id"], PNG).json()["image"]
+    assert (coupon_store.images_dir() / name).exists()
+    assert client.delete(f"/api/coupons/{c['voucher_id']}").status_code == 204
+    assert not (coupon_store.images_dir() / name).exists()

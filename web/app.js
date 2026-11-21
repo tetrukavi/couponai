@@ -24,7 +24,10 @@ async function shrinkImage(file, maxSide = 1600) {
     const c = document.createElement('canvas');
     c.width = Math.round(img.width * k);
     c.height = Math.round(img.height * k);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';  // transparent PNGs would otherwise turn black in JPEG
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
     return c.toDataURL('image/jpeg', 0.88).split(',')[1];
   } finally {
     URL.revokeObjectURL(url);
@@ -58,6 +61,9 @@ window.couponApp = function () {
     showAll: false,
     editBal: {},
     confirmDelete: null,
+    viewer: null,      // URL of the photo shown full screen
+    photoFor: null,    // coupon whose photo is being added/replaced from its card
+    photoBusy: null,   // voucher_id while a card photo uploads
     sheetOpen: false,
     form: {},
     unsure: [],
@@ -252,7 +258,7 @@ window.couponApp = function () {
     // ---------- Add coupon ----------
     emptyForm() {
       return { kind: 'store', store: '', card_network: '', code: '', face_value: '', paid_amount: '',
-               remaining_balance: '', expiry_date: '', purchased_from: '', notes: '', link: '' };
+               remaining_balance: '', expiry_date: '', purchased_from: '', notes: '', link: '', photo: '' };
     },
     openSheet() {
       this.form = this.emptyForm();
@@ -287,9 +293,15 @@ window.couponApp = function () {
       this.saving = true;
       this.formError = null;
       try {
-        await this.api('POST', '/api/coupons', body);
+        const c = await this.api('POST', '/api/coupons', body);
         this.sheetOpen = false;
-        this.flash('Coupon saved ✓');
+        let msg = 'Coupon saved ✓';
+        if (f.photo) {
+          try {
+            await this.api('PUT', `/api/coupons/${c.voucher_id}/image`, { media_type: 'image/jpeg', data: f.photo });
+          } catch (e) { msg = 'Coupon saved, but the photo failed: ' + e.message; }
+        }
+        this.flash(msg);
         this.loadCoupons();
       } catch (e) {
         this.formError = e.message;
@@ -306,6 +318,7 @@ window.couponApp = function () {
       this.formError = null;
       try {
         const data = await shrinkImage(file);
+        this.form.photo = data;  // kept with the coupon unless removed in the form
         const d = await this.api('POST', '/api/coupons/extract', { media_type: 'image/jpeg', data });
         if (!d.is_coupon) throw new Error("That doesn't look like a coupon. Try another image.");
         const s = v => (v == null ? '' : String(v));
@@ -327,6 +340,46 @@ window.couponApp = function () {
       } finally {
         this.reading = false;
       }
+    },
+
+    // ---------- Photo ----------
+    photoUrl(c) { return `/api/coupons/${c.voucher_id}/image?v=${encodeURIComponent(c.image)}`; },
+    async pickFormPhoto(ev) {
+      const file = ev.target.files?.[0];
+      ev.target.value = '';
+      if (!file) return;
+      try { this.form.photo = await shrinkImage(file); } catch (e) { this.formError = e.message; }
+    },
+    choosePhoto(c) {
+      this.photoFor = c;
+      this.$refs.cardPhoto.click();
+    },
+    async uploadCardPhoto(ev) {
+      const file = ev.target.files?.[0];
+      ev.target.value = '';
+      const c = this.photoFor;
+      this.photoFor = null;
+      if (!file || !c) return;
+      this.photoBusy = c.voucher_id;
+      try {
+        const data = await shrinkImage(file);
+        await this.api('PUT', `/api/coupons/${c.voucher_id}/image`, { media_type: 'image/jpeg', data });
+        this.flash('Photo saved');
+        await this.loadCoupons();
+      } catch (e) { this.flash(e.message); } finally { this.photoBusy = null; }
+    },
+    async removePhoto(c) {
+      if (this.confirmDelete !== 'photo:' + c.voucher_id) {
+        this.confirmDelete = 'photo:' + c.voucher_id;
+        setTimeout(() => { if (this.confirmDelete === 'photo:' + c.voucher_id) this.confirmDelete = null; }, 3000);
+        return;
+      }
+      this.confirmDelete = null;
+      try {
+        await this.api('DELETE', `/api/coupons/${c.voucher_id}/image`);
+        this.flash('Photo removed');
+        this.loadCoupons();
+      } catch (e) { this.flash(e.message); }
     },
 
     startEdit(c) {

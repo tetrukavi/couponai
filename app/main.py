@@ -1,6 +1,8 @@
 """FastAPI entry point: SSE search stream + static single-page UI."""
 
 import asyncio
+import base64
+import binascii
 import csv
 import io
 import json
@@ -250,6 +252,48 @@ async def delete_coupon(voucher_id: str) -> Response:
 class ImageIn(BaseModel):
     media_type: str
     data: str = Field(max_length=8_000_000)  # base64
+
+
+@app.put("/api/coupons/{voucher_id}/image")
+async def set_coupon_image(voucher_id: str, img: ImageIn) -> JSONResponse:
+    """Attach the coupon's photo (stored on the server only; never sent to the AI)."""
+    try:
+        data = base64.b64decode(img.data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(422, "the photo could not be read") from None
+    try:
+        v = coupon_store.set_image(voucher_id, data)
+    except KeyError:
+        raise HTTPException(404, "Photos can be added only to coupons added in the app") from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return JSONResponse(v.model_dump(mode="json"))
+
+
+@app.get("/api/coupons/{voucher_id}/image")
+async def get_coupon_image(voucher_id: str) -> FileResponse:
+    try:
+        path, media_type = coupon_store.image_file(voucher_id)
+    except KeyError:
+        raise HTTPException(404, "No photo") from None
+    # the URL carries the file name (?v=...), so a new photo gets a new URL
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "private, max-age=2592000",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@app.delete("/api/coupons/{voucher_id}/image")
+async def delete_coupon_image(voucher_id: str) -> JSONResponse:
+    try:
+        v = coupon_store.remove_image(voucher_id)
+    except KeyError:
+        raise HTTPException(404, "Only coupons added in the app can be edited") from None
+    return JSONResponse(v.model_dump(mode="json"))
 
 
 @app.post("/api/coupons/extract")

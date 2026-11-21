@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 data/*.sqlite*
+data/coupon_images/
 # real voucher files stay local — only the generated sample is tracked
 data/vouchers/*
 !data/vouchers/my_vouchers.xlsx

@@ -14,7 +14,8 @@ It's a personal project, built for a household (two people sharing one coupon wa
 - **Your coupons, instantly.** Search your coupons for a store in milliseconds, including
   multi-store gift cards (BuyMe, Max, תו הזהב…) that the store accepts.
 - **Add coupons in seconds:** a short form, or *fill from screenshot* (Claude reads a photo
-  of the voucher; you check the fields before saving).
+  of the voucher; you check the fields before saving). Keep a photo of the gift card or
+  barcode with the coupon and show it full screen at the checkout.
 - **Online check, only when you approve it.** A web-search agent reads the store's site for
   accepted gift cards and current promotions. Before anything paid runs you see an estimate
   ("up to ~$0.07"); results are then saved for the rest of the calendar month, so repeat

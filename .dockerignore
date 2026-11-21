@@ -6,5 +6,6 @@
 .ruff_cache
 *.egg-info
 data/*.sqlite*
+data/coupon_images/
 data/vouchers
 tests

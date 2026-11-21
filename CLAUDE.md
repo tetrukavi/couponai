@@ -23,7 +23,11 @@ the best way to pay. Built for speed: the user is standing at a checkout counter
    codes stay local. Never send voucher codes or balances to the LLM or to web searches. Only
    store names, issuers, and card networks may leave the machine. **One exception:** the
    "Fill from screenshot" feature sends the image the user picked to Claude, only when the user
-   explicitly taps it, and nothing is saved until the user confirms the form. Images are not stored.
+   explicitly taps it, and nothing is saved until the user confirms the form.
+   **Coupon photos** (one per app coupon) are stored only as files in `<state_dir>/coupon_images/`
+   (the server volume), via `app/coupon_store.py`. They are never committed, never sent to the LLM
+   or the web (not even to "Fill from screenshot" later), and served only to logged-in users.
+   Uploads are checked by their bytes: JPEG, PNG or WebP only, at most 6 MB.
 
 7. **Ask before paying.** A normal search (`mode=ask`) must never make a paid API call: no web
    search, no LLM store-name normalization, no LLM comparison. Paid work runs only after the user
@@ -62,14 +66,14 @@ the best way to pay. Built for speed: the user is standing at a checkout counter
 - `data/store_aliases.yaml`, `data/card_networks.yaml`: normalization & card-network seeds
 - `data/clubs.yaml`: which clubs to check and which connector each uses
 - `app/catalogs.py`: official merchant lists of gift-card networks (BuyMe…), refreshed monthly
-- `app/coupon_store.py`: app-added coupons (SQLite); `app/agents/coupon_reader.py`: screenshot → form draft
+- `app/coupon_store.py`: app-added coupons (SQLite) and their photos (files); `app/agents/coupon_reader.py`: screenshot → form draft
 - Haiku 5.5 workers use the basic web tools (`web_search_20250305` / `web_fetch_20250910`);
   the `*_20260209` versions only work on Opus/Sonnet 4.6+ (configurable in `app/config.py`)
 
 ## Deployment
 
 - GitHub (public): code only. Railway builds the `Dockerfile` on every push to `main`.
-- Railway volume at `/data` = `COUPONAI_STATE_DIR` (coupon db + saved results).
+- Railway volume at `/data` = `COUPONAI_STATE_DIR` (coupon db, coupon photos, saved results).
 - Server variables: `ANTHROPIC_API_KEY`, `COUPONAI_USERS`, `COUPONAI_SECRET_KEY`
   (make them with `python scripts/hash_password.py`), optional `COUPONAI_API_TOKEN`.
 - Local dev has no login and uses `data/` (dummy sample xlsx). It's a separate database
